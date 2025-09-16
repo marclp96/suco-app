@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-
-// Importa navbar y otras páginas
 import 'nav.dart';
 import 'today_page.dart';
 import 'live_home.dart';
 import 'profile.dart';
 import 'be_here_now.dart';
-import 'app_drawer.dart'; // 👈 Drawer importado
+import 'app_drawer.dart'; 
+import 'team_list.dart';
 
 class JourneyPage extends StatefulWidget {
   const JourneyPage({super.key});
@@ -27,7 +26,7 @@ class _JourneyPageState extends State<JourneyPage> {
         nextPage = const TodayPage();
         break;
       case 1:
-        nextPage = const PlaceholderPage(title: "Team Page (pending)");
+        nextPage = const TeamListPage();
         break;
       case 2:
         nextPage = const JourneyPage();
@@ -329,23 +328,6 @@ class _JourneyPageState extends State<JourneyPage> {
             }).toList(),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// 👇 Placeholder temporal para Team Page
-class PlaceholderPage extends StatelessWidget {
-  final String title;
-  const PlaceholderPage({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(title, style: const TextStyle(color: Colors.white)),
       ),
     );
   }

@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Import real pages
 import 'favorites.dart';
-import 'auth_page.dart'; // 👈 Para redirigir tras logout
+import 'login_page.dart'; // 👈 Para redirigir tras logout
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -160,7 +160,7 @@ class AppDrawer extends StatelessWidget {
                   if (context.mounted) {
                     Navigator.pushAndRemoveUntil(
                       context,
-                      MaterialPageRoute(builder: (_) => const AuthPage()),
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
                       (route) => false,
                     );
                   }

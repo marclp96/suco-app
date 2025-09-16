@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
-import 'app_drawer.dart'; // 👈 Drawer conectado
+import 'app_drawer.dart';
+import 'duration_popup.dart'; // 👈 importamos el popup de duración
 
 class BeHereNowPage extends StatefulWidget {
   const BeHereNowPage({super.key});
@@ -19,18 +20,21 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     super.initState();
 
     _videoController = VideoPlayerController.networkUrl(
-      Uri.parse("https://www.youtube.com/watch?v=xyshPstbe-k"),
+      Uri.parse(
+        // ✅ Vídeo de prueba (Big Buck Bunny, dominio público, MP4 válido)
+        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+      ),
     )..initialize().then((_) {
         setState(() {});
       });
 
     _chewieController = ChewieController(
       videoPlayerController: _videoController,
-      autoPlay: true, // ▶️ autoplay activado
+      autoPlay: true,
       looping: false,
       allowFullScreen: true,
       allowPlaybackSpeedChanging: true,
-      showControls: true, // 🎛️ controles visibles
+      showControls: true,
       materialProgressColors: ChewieProgressColors(
         playedColor: const Color(0xFFCBFBC7),
         handleColor: Colors.white,
@@ -162,65 +166,76 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
           const SizedBox(height: 12),
           Column(
             children: cards.map((card) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
-                      ),
-                      child: Image.asset(
-                        card["image"]!,
-                        width: 100,
-                        height: 80,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              card["title"]!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              card["subtitle"]!,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+              return GestureDetector(
+                onTap: () {
+                  if (card["title"] == "Be Here Now") {
+                    // 👈 SOLO la primera meditación abre el flujo
+                    showDialog(
+                      context: context,
+                      builder: (_) => const DurationPopup(),
+                    );
+                  }
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A2A),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          bottomLeft: Radius.circular(16),
+                        ),
+                        child: Image.asset(
+                          card["image"]!,
+                          width: 100,
+                          height: 80,
+                          fit: BoxFit.cover,
                         ),
                       ),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.only(right: 12),
-                      width: 36,
-                      height: 36,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFCBFBC7),
-                        shape: BoxShape.circle,
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                card["title"]!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                card["subtitle"]!,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: const Icon(Icons.play_arrow,
-                          color: Colors.black, size: 20),
-                    ),
-                  ],
+                      Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        width: 36,
+                        height: 36,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFCBFBC7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.play_arrow,
+                            color: Colors.black, size: 20),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }).toList(),

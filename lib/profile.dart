@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:suco_app/team_dashboard.dart';
 import 'nav.dart'; 
 import 'today_page.dart';
 import 'journey_page.dart';
 import 'live_home.dart';
+import 'team_list.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -23,7 +25,7 @@ class _ProfilePageState extends State<ProfilePage> {
         nextPage = const TodayPage();
         break;
       case 1:
-        nextPage = const PlaceholderPage(title: "Team Page (pending)");
+        nextPage = const TeamListPage();
         break;
       case 2:
         nextPage = const JourneyPage();

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:suco_app/team_dashboard.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:audioplayers/audioplayers.dart';
-
-// Importa navbar y páginas relacionadas
 import 'nav.dart';
 import 'journey_page.dart';
 import 'live_home.dart';
 import 'profile.dart';
-import 'test_question.dart'; // 👈 aquí está tu MindfulnessTestPage
+import 'test_question.dart'; 
 import 'app_drawer.dart';
 import 'challenge_full.dart';
+import 'team_list.dart';
 
 class TodayPage extends StatefulWidget {
   const TodayPage({super.key});
@@ -105,7 +105,7 @@ class _TodayPageState extends State<TodayPage> {
         nextPage = const TodayPage();
         break;
       case 1:
-        nextPage = const PlaceholderPage(title: "Team Page (pending)");
+        nextPage = const TeamListPage();
         break;
       case 2:
         nextPage = const JourneyPage();
@@ -180,10 +180,6 @@ class _TodayPageState extends State<TodayPage> {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
-
-  // ===============================
-  // 🔹 UI Components
-  // ===============================
 
   Widget _buildGreetingSection() {
     return Padding(
@@ -593,23 +589,6 @@ class _TodayPageState extends State<TodayPage> {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-// 👇 Placeholder temporal para Team Page
-class PlaceholderPage extends StatelessWidget {
-  final String title;
-  const PlaceholderPage({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(title, style: const TextStyle(color: Colors.white)),
       ),
     );
   }

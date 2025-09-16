@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:suco_app/team_dashboard.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-// Importa navbar y otras páginas
 import 'nav.dart';
 import 'today_page.dart';
 import 'journey_page.dart';
 import 'profile.dart';
+import 'team_list.dart';
 
 class LiveHomePage extends StatefulWidget {
   const LiveHomePage({super.key});
@@ -28,7 +28,7 @@ class _LiveHomePageState extends State<LiveHomePage> {
         nextPage = const TodayPage();
         break;
       case 1:
-        nextPage = const PlaceholderPage(title: "Team Page (pending)");
+        nextPage = const TeamListPage();
         break;
       case 2:
         nextPage = const JourneyPage();
