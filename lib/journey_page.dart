@@ -1,11 +1,14 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'nav.dart';
 import 'today_page.dart';
 import 'live_home.dart';
 import 'profile.dart';
 import 'be_here_now.dart';
-import 'app_drawer.dart'; 
+import 'app_drawer.dart';
 import 'team_list.dart';
+import 'widgets/vimeo_player_widget.dart'; // ✅ ruta correcta
 
 class JourneyPage extends StatefulWidget {
   const JourneyPage({super.key});
@@ -15,7 +18,30 @@ class JourneyPage extends StatefulWidget {
 }
 
 class _JourneyPageState extends State<JourneyPage> {
-  int _selectedIndex = 2; // Journey
+  int _selectedIndex = 2;
+  String? _videoId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIntroVideo();
+  }
+
+  Future<void> _loadIntroVideo() async {
+    final response = await Supabase.instance.client
+        .from('journey')
+        .select('intro_video_url')
+        .maybeSingle();
+
+    if (response != null && response['intro_video_url'] != null) {
+      final url = response['intro_video_url'] as String;
+      final regex = RegExp(r'vimeo\.com/(\d+)');
+      final match = regex.firstMatch(url);
+      setState(() {
+        _videoId = match != null ? match.group(1)! : url;
+      });
+    }
+  }
 
   void _onNavTapped(int index) {
     if (index == _selectedIndex) return;
@@ -44,11 +70,59 @@ class _JourneyPageState extends State<JourneyPage> {
     );
   }
 
+  void _showIntroVideo(BuildContext context) {
+    if (_videoId == null) return;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Intro Video",
+      pageBuilder: (context, anim1, anim2) {
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(
+            children: [
+              // Fondo difuminado
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(color: Colors.black.withOpacity(0.5)),
+              ),
+
+              // Vídeo centrado (igual que en Be Here Now)
+              Center(
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: VimeoPlayerWidget(
+                    videoId: _videoId!,
+                    autoPlay: true,
+                  ),
+                ),
+              ),
+
+              // Botón de cerrar
+              Positioned(
+                top: 40,
+                right: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(opacity: anim1, child: child);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
-      drawer: const AppDrawer(), // 👈 Drawer conectado
+      drawer: const AppDrawer(),
       body: SafeArea(
         child: ListView(
           children: [
@@ -161,7 +235,7 @@ class _JourneyPageState extends State<JourneyPage> {
           Builder(
             builder: (context) => IconButton(
               icon: const Icon(Icons.menu, color: Colors.white),
-              onPressed: () => Scaffold.of(context).openDrawer(), // 👈 abre Drawer
+              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
         ],
@@ -204,7 +278,7 @@ class _JourneyPageState extends State<JourneyPage> {
         width: double.infinity,
         height: 48,
         child: ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () => _showIntroVideo(context),
           icon: const Icon(Icons.play_arrow, color: Colors.black),
           label: const Text(
             "Watch Intro",
@@ -264,8 +338,9 @@ class _JourneyPageState extends State<JourneyPage> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color:
-                      locked ? const Color(0xFF2A2A2A) : const Color(0xFF1A1A1A),
+                  color: locked
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFF1A1A1A),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(

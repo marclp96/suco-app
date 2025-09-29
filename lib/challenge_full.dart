@@ -59,7 +59,7 @@ class ChallengeFullPage extends StatelessWidget {
                             color: Colors.white54, size: 16),
                         SizedBox(width: 6),
                         Text(
-                          "Jan 13, 2025",
+                          "Oct 2, 2025",
                           style: TextStyle(
                             color: Colors.white54,
                             fontSize: 13,

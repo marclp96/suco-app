@@ -1,7 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class TeamDashboardPage extends StatelessWidget {
-  const TeamDashboardPage({super.key});
+class TeamDashboardPage extends StatefulWidget {
+  final String teamId;
+  final String teamName;
+
+  const TeamDashboardPage({
+    super.key,
+    required this.teamId,
+    required this.teamName,
+  });
+
+  @override
+  State<TeamDashboardPage> createState() => _TeamDashboardPageState();
+}
+
+class _TeamDashboardPageState extends State<TeamDashboardPage> {
+  bool _loadingMembers = true;
+  List<Map<String, dynamic>> _members = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMembers();
+  }
+
+  Future<void> _loadMembers() async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final response = await supabase
+          .from('team_members')
+          .select('role, profiles(full_name, avatar_url)')
+          .eq('team_id', widget.teamId);
+
+      setState(() {
+        _members = List<Map<String, dynamic>>.from(response);
+        _loadingMembers = false;
+      });
+    } catch (e) {
+      debugPrint("Error loading members: $e");
+      setState(() => _loadingMembers = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +54,7 @@ class TeamDashboardPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
+              // 🔹 Header
               Row(
                 children: [
                   IconButton(
@@ -21,9 +62,9 @@ class TeamDashboardPage extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    "Zen Warriors",
-                    style: TextStyle(
+                  Text(
+                    widget.teamName,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -38,7 +79,7 @@ class TeamDashboardPage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Stats
+              // 🔹 Stats
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -56,7 +97,7 @@ class TeamDashboardPage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Next session
+              // 🔹 Next session
               const Text("Next Team Session",
                   style: TextStyle(
                       color: Colors.white,
@@ -115,7 +156,7 @@ class TeamDashboardPage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Banner con overlay, texto y botones
+              // 🔹 Banner con overlay
               Stack(
                 children: [
                   ClipRRect(
@@ -186,20 +227,82 @@ class TeamDashboardPage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Recent activity
+              // 🔹 Team Members (nuevo bloque con query real)
+              const Text("Team Members",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              _loadingMembers
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Colors.green))
+                  : _members.isEmpty
+                      ? const Text("No members yet",
+                          style: TextStyle(color: Colors.white70))
+                      : Column(
+                          children: _members.map((m) {
+                            final profile = m['profiles'];
+                            final name = profile?['full_name'] ?? "Unknown";
+                            final avatar = profile?['avatar_url'];
+                            final role = m['role'] ?? "member";
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2A2A2A),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundImage: avatar != null
+                                        ? NetworkImage(avatar)
+                                        : const AssetImage(
+                                                "assets/images/default_avatar.png")
+                                            as ImageProvider,
+                                    radius: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(name,
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 15)),
+                                        Text(role,
+                                            style: const TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 13)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+              const SizedBox(height: 20),
+
+              // 🔹 Recent activity
               const Text("Recent Activity",
                   style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              _buildActivity("assets/images/user1.png", "Sarah J.",
-                  "Completed a 30 minute breathwork!", 4),
-              _buildActivity("assets/images/user2.png", "Nick L.",
+              _buildActivity("assets/images/user1.png", "Grace",
+                  "Completed a 30 minute breathwork session!", 4),
+              _buildActivity("assets/images/user2.png", "Sander",
                   "Reached a 7-day meditation streak!", 7),
-              _buildActivity("assets/images/user3.png", "Lee M.",
+              _buildActivity("assets/images/user3.png", "Magnus",
                   "Completed a 15 minute active meditation!", 2),
-              _buildActivity("assets/images/user4.png", "Savannah B.",
+              _buildActivity("assets/images/user4.png", "Jamie",
                   "Joined the Zen Warriors!", 8),
             ],
           ),
@@ -255,8 +358,11 @@ class _StatItem extends StatelessWidget {
   final String label;
   final String value;
 
-  const _StatItem(
-      {required this.icon, required this.label, required this.value});
+  const _StatItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -1,12 +1,29 @@
-import 'package:flutter/material.dart'; 
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'nav.dart';
 import 'team_dashboard.dart';
 import 'today_page.dart';
 import 'journey_page.dart';
 import 'live_home.dart';
+import 'create_team.dart';
 
-class TeamListPage extends StatelessWidget {
+final supabase = Supabase.instance.client;
+
+class TeamListPage extends StatefulWidget {
   const TeamListPage({super.key});
+
+  @override
+  State<TeamListPage> createState() => _TeamListPageState();
+}
+
+class _TeamListPageState extends State<TeamListPage> {
+  late Future<List<Map<String, dynamic>>> _teamsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _teamsFuture = fetchTeams();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,38 +46,71 @@ class TeamListPage extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.menu, color: Colors.white),
+                  Row(
+                    children: [
+                      // Botón para crear team
+                      IconButton(
+                        onPressed: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CreateTeamPage(),
+                            ),
+                          );
+                          // 👇 Recargamos la lista después de crear un team
+                          setState(() {
+                            _teamsFuture = fetchTeams();
+                          });
+                        },
+                        icon: const Icon(Icons.add, color: Color(0xFFCBFBC7)),
+                      ),
+                      IconButton(
+                        onPressed: () {},
+                        icon: const Icon(Icons.menu, color: Colors.white),
+                      ),
+                    ],
                   ),
                 ],
               ),
               const SizedBox(height: 20),
               Expanded(
-                child: ListView(
-                  children: [
-                    _buildTeamCard(
-                      context,
-                      "Zen Warriors",
-                      "Getting together to become the greatest zen warriors ever!",
-                      "12 members",
-                      "assets/images/team1.png",
-                    ),
-                    _buildTeamCard(
-                      context,
-                      "Mindful Family",
-                      "Just want to be mindful all together, so we can all practice meditation.",
-                      "8 members",
-                      "assets/images/team2.png",
-                    ),
-                    _buildTeamCard(
-                      context,
-                      "SUCO Internal",
-                      "The company team for the SUCO employees. Let’s get zen.",
-                      "15 members",
-                      "assets/images/team3.png",
-                    ),
-                  ],
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _teamsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Text("Error: ${snapshot.error}",
+                          style: const TextStyle(color: Colors.redAccent));
+                    }
+
+                    final teams = snapshot.data ?? [];
+                    if (teams.isEmpty) {
+                      return const Text("No teams yet",
+                          style: TextStyle(color: Colors.white70));
+                    }
+
+                    return ListView.builder(
+                      itemCount: teams.length,
+                      itemBuilder: (context, index) {
+                        final team = teams[index];
+                        final membersCount = team['team_members'] != null
+                            ? (team['team_members'] as List).length
+                            : 0;
+
+                        return _buildTeamCard(
+                          context,
+                          team['id'],
+                          team['name'],
+                          team['description'] ?? '',
+                          membersCount,
+                          "assets/images/team1.png",
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             ],
@@ -87,16 +137,22 @@ class TeamListPage extends StatelessWidget {
 
   Widget _buildTeamCard(
     BuildContext context,
+    String teamId,
     String title,
     String subtitle,
-    String members,
+    int membersCount,
     String imagePath,
   ) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const TeamDashboardPage()),
+          MaterialPageRoute(
+            builder: (_) => TeamDashboardPage(
+              teamId: teamId,
+              teamName: title,
+            ),
+          ),
         );
       },
       child: Container(
@@ -122,14 +178,24 @@ class TeamListPage extends StatelessWidget {
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 16)),
-                  Text(members,
-                      style: const TextStyle(color: Colors.grey, fontSize: 14)),
                   const SizedBox(height: 4),
-                  Text(subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 14)),
+                  Text(
+                    "$membersCount members",
+                    style: const TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -137,6 +203,20 @@ class TeamListPage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// 👇 Query para traer teams con sus miembros
+Future<List<Map<String, dynamic>>> fetchTeams() async {
+  try {
+    final response = await supabase
+        .from('teams')
+        .select('id, name, description, team_members(id)'); // incluimos miembros
+    print("Teams response: $response"); // 👈 debug
+    return List<Map<String, dynamic>>.from(response);
+  } catch (e) {
+    print("Error fetching teams: $e");
+    return [];
   }
 }
 

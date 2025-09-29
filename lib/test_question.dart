@@ -1,23 +1,106 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'test_results.dart';
-import 'app_drawer.dart'; // 👈 Drawer importado
+import 'app_drawer.dart';
 
-class MindfulnessTestPage extends StatefulWidget {
-  const MindfulnessTestPage({super.key});
+class TestQuestionPage extends StatefulWidget {
+  final String testId; // 👈 recibe el ID del test
+
+  const TestQuestionPage({super.key, required this.testId});
 
   @override
-  State<MindfulnessTestPage> createState() => _MindfulnessTestPageState();
+  State<TestQuestionPage> createState() => _TestQuestionPageState();
 }
 
-class _MindfulnessTestPageState extends State<MindfulnessTestPage> {
-  int selectedIndex = 1; // Default to "Disagree"
-  double progressValue = 0.2; // 20% progress (Question 5/25)
+class _TestQuestionPageState extends State<TestQuestionPage> {
+  final supabase = Supabase.instance.client;
+
+  List<Map<String, dynamic>> _questions = [];
+  int _currentIndex = 0;
+  String? _selectedKey;
+  final Map<String, int> _answersCount = {}; // para contar keys elegidos
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuestions();
+  }
+
+  Future<void> _loadQuestions() async {
+    final response = await supabase
+        .from('test_questions')
+        .select()
+        .eq('test_id', widget.testId)
+        .order('created_at', ascending: true);
+
+    setState(() {
+      _questions =
+          response.map<Map<String, dynamic>>((q) => Map<String, dynamic>.from(q)).toList();
+      _loading = false;
+    });
+  }
+
+  void _nextQuestion() {
+    if (_selectedKey != null) {
+      // contar respuesta
+      _answersCount[_selectedKey!] = (_answersCount[_selectedKey!] ?? 0) + 1;
+
+      if (_currentIndex < _questions.length - 1) {
+        setState(() {
+          _currentIndex++;
+          _selectedKey = null;
+        });
+      } else {
+        // calcular resultado
+        final winningKey = _answersCount.entries
+            .reduce((a, b) => a.value >= b.value ? a : b)
+            .key;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TestResultsPage(
+              testId: widget.testId,
+              resultKey: winningKey,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  void _previousQuestion() {
+    if (_currentIndex > 0) {
+      setState(() {
+        _currentIndex--;
+        _selectedKey = null;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF1A1A1A),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_questions.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF1A1A1A),
+        body: Center(child: Text("No questions available", style: TextStyle(color: Colors.white))),
+      );
+    }
+
+    final question = _questions[_currentIndex];
+    final options = List<Map<String, dynamic>>.from(question['options']);
+
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
-      drawer: const AppDrawer(), // 👈 Drawer aquí
+      drawer: const AppDrawer(),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -25,7 +108,9 @@ class _MindfulnessTestPageState extends State<MindfulnessTestPage> {
             children: [
               _buildHeader(),
               const SizedBox(height: 32),
-              Expanded(child: _buildMainCard()),
+              Expanded(
+                child: _buildMainCard(question['question'], options),
+              ),
               const SizedBox(height: 24),
               _buildActionButtons(),
             ],
@@ -43,25 +128,27 @@ class _MindfulnessTestPageState extends State<MindfulnessTestPage> {
           icon: Icons.arrow_back,
           onTap: () => Navigator.of(context).pop(),
         ),
-        const Text(
+        Text(
           'Mindfulness Test',
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
-            fontSize: 28,
+            fontSize: 22,
             fontWeight: FontWeight.w700,
           ),
         ),
         Builder(
           builder: (context) => RoundedIconButton(
             icon: Icons.menu,
-            onTap: () => Scaffold.of(context).openDrawer(), // 👈 abre Drawer
+            onTap: () => Scaffold.of(context).openDrawer(),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildMainCard() {
+  Widget _buildMainCard(String questionText, List<Map<String, dynamic>> options) {
+    final progress = (_currentIndex + 1) / _questions.length;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -72,92 +159,44 @@ class _MindfulnessTestPageState extends State<MindfulnessTestPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildQuestionHeader(),
+          Text(
+            "Question ${_currentIndex + 1}/${_questions.length}",
+            style: const TextStyle(color: Colors.white70, fontSize: 16),
+          ),
           const SizedBox(height: 12),
-          ProgressBar(value: progressValue),
+          ProgressBar(value: progress),
           const SizedBox(height: 20),
-          _buildQuestionText(),
+          Text(
+            questionText,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
+          ),
           const SizedBox(height: 32),
-          Expanded(child: _buildAnswerOptions()),
-          _buildFooter(),
+          Expanded(
+            child: ListView.separated(
+              itemCount: options.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                final option = options[index];
+                final key = option['key'];
+                final label = option['label'];
+                return OptionTile(
+                  label: label,
+                  selected: _selectedKey == key,
+                  onTap: () {
+                    setState(() {
+                      _selectedKey = key;
+                    });
+                  },
+                );
+              },
+            ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuestionHeader() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: const [
-        Text(
-          'Question 5',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        SizedBox(width: 4),
-        Text(
-          '/25',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuestionText() {
-    return const Text(
-      'When someone criticizes my work, I usually feel defensive and want to explain why they\'re wrong about their feedback.',
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 22,
-        fontWeight: FontWeight.w700,
-        height: 1.3,
-      ),
-    );
-  }
-
-  Widget _buildAnswerOptions() {
-    final options = [
-      'Strongly Disagree',
-      'Disagree',
-      'Neutral',
-      'Agree',
-      'Strongly Agree',
-    ];
-
-    return ListView.separated(
-      itemCount: options.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        return OptionTile(
-          label: options[index],
-          selected: selectedIndex == index,
-          onTap: () {
-            setState(() {
-              selectedIndex = index;
-            });
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildFooter() {
-    return const Center(
-      child: Text(
-        '',
-        style: TextStyle(
-          color: Colors.white54,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
       ),
     );
   }
@@ -168,21 +207,14 @@ class _MindfulnessTestPageState extends State<MindfulnessTestPage> {
         Expanded(
           child: SecondaryButton(
             text: 'Previous',
-            onTap: () {},
+            onTap: _previousQuestion,
           ),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: PrimaryButton(
-            text: 'Next',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const MindfulnessResultsPage(),
-                ),
-              );
-            },
+            text: _currentIndex == _questions.length - 1 ? 'Finish' : 'Next',
+            onTap: _nextQuestion,
           ),
         ),
       ],
@@ -190,7 +222,8 @@ class _MindfulnessTestPageState extends State<MindfulnessTestPage> {
   }
 }
 
-// Reusable rounded icon button
+// ⬇️ Reutilizamos tus componentes previos (RoundedIconButton, ProgressBar, OptionTile, PrimaryButton, SecondaryButton)
+
 class RoundedIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -222,7 +255,6 @@ class RoundedIconButton extends StatelessWidget {
   }
 }
 
-// Progress bar component
 class ProgressBar extends StatelessWidget {
   final double value;
 
@@ -250,7 +282,6 @@ class ProgressBar extends StatelessWidget {
   }
 }
 
-// Option tile with radio button
 class OptionTile extends StatelessWidget {
   final String label;
   final bool selected;
@@ -273,15 +304,6 @@ class OptionTile extends StatelessWidget {
         border: selected
             ? Border.all(color: const Color(0xFFCBFBC7), width: 2)
             : null,
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: const Color(0xFFCBFBC7).withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
       ),
       child: Material(
         color: Colors.transparent,
@@ -291,43 +313,13 @@ class OptionTile extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: selected ? const Color(0xFFCBFBC7) : Colors.white54,
-                      width: 2,
-                    ),
-                  ),
-                  child: selected
-                      ? Center(
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFCBFBC7),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? Colors.white : Colors.white70,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : Colors.white70,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -336,7 +328,6 @@ class OptionTile extends StatelessWidget {
   }
 }
 
-// Primary button
 class PrimaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
@@ -356,7 +347,6 @@ class PrimaryButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(32),
         child: InkWell(
           borderRadius: BorderRadius.circular(32),
-          splashColor: Colors.black.withOpacity(0.1),
           onTap: onTap,
           child: Center(
             child: Text(
@@ -374,7 +364,6 @@ class PrimaryButton extends StatelessWidget {
   }
 }
 
-// Secondary button
 class SecondaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
@@ -401,7 +390,6 @@ class SecondaryButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(32),
-          splashColor: const Color(0xFFCBFBC7).withOpacity(0.1),
           onTap: onTap,
           child: Center(
             child: Text(

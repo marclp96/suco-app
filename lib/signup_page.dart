@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'today_page.dart';
 import 'login_page.dart';
 
@@ -34,6 +35,22 @@ class _SignUpPageState extends State<SignUpPage> {
     return "Something went wrong. Please try again.";
   }
 
+  /// 🔹 Registrar al usuario en OneSignal (con debug logs)
+  Future<void> _registerInOneSignal(String email) async {
+    try {
+      debugPrint("👉 OneSignal login called with $email");
+      OneSignal.login(email);
+
+      debugPrint("👉 Sending tag new_user:true …");
+      await OneSignal.User.addTags({"new_user": "true"});
+
+      final tags = await OneSignal.User.getTags();
+      debugPrint("✅ OneSignal tags after signup: $tags");
+    } catch (e) {
+      debugPrint("❌ Error al registrar en OneSignal: $e");
+    }
+  }
+
   Future<void> _signUp() async {
     if (!_acceptTerms) {
       setState(() {
@@ -53,7 +70,7 @@ class _SignUpPageState extends State<SignUpPage> {
       final password = _passwordController.text.trim();
       final location = _locationController.text.trim();
 
-      await supabase.auth.signUp(
+      final response = await supabase.auth.signUp(
         email: email,
         password: password,
         data: {
@@ -62,11 +79,16 @@ class _SignUpPageState extends State<SignUpPage> {
         },
       );
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const TodayPage()),
-        );
+      // 🔹 Si el signup fue exitoso, registra en OneSignal
+      if (response.user != null) {
+        await _registerInOneSignal(email);
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const TodayPage()),
+          );
+        }
       }
     } catch (e) {
       setState(() => _error = _mapError(e));
@@ -86,7 +108,7 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true, // 🔹 Fondo cubre toda la pantalla
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -111,11 +133,10 @@ class _SignUpPageState extends State<SignUpPage> {
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 100, 24, 20), // 🔹 empuja hacia abajo el contenido
+          padding: const EdgeInsets.fromLTRB(24, 100, 24, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Logo
               Image.asset("assets/images/Suco-Lime.png", height: 60),
               const SizedBox(height: 24),
 

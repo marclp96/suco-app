@@ -570,7 +570,10 @@ class _TodayPageState extends State<TodayPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const MindfulnessTestPage(),
+                            builder: (_) => TestQuestionPage(
+                              testId:
+                                  "06d15c08-1493-40da-907f-a8ce4eb11c77", // 👈 Mindfulness Test ID
+                            ),
                           ),
                         );
                       },

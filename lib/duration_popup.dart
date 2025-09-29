@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'meditation_player.dart';
 
 class DurationPopup extends StatefulWidget {
-  const DurationPopup({super.key});
+  final String audioUrl;
+
+  const DurationPopup({super.key, required this.audioUrl});
 
   @override
   State<DurationPopup> createState() => _DurationPopupState();
@@ -38,9 +40,10 @@ class _DurationPopupState extends State<DurationPopup> {
                 const Text(
                   "Select Duration",
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
@@ -59,8 +62,10 @@ class _DurationPopupState extends State<DurationPopup> {
                   onTap: () => setState(() => _selectedIndex = index),
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 12),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: _selectedIndex == index
                           ? const Color(0xFFCBFBC7)
@@ -73,22 +78,26 @@ class _DurationPopupState extends State<DurationPopup> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item["label"]!,
-                                style: TextStyle(
-                                  color: _selectedIndex == index
-                                      ? Colors.black
-                                      : Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                )),
+                            Text(
+                              item["label"]!,
+                              style: TextStyle(
+                                color: _selectedIndex == index
+                                    ? Colors.black
+                                    : Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text(item["subtitle"]!,
-                                style: TextStyle(
-                                  color: _selectedIndex == index
-                                      ? Colors.black87
-                                      : Colors.white70,
-                                  fontSize: 12,
-                                )),
+                            Text(
+                              item["subtitle"]!,
+                              style: TextStyle(
+                                color: _selectedIndex == index
+                                    ? Colors.black87
+                                    : Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                         Icon(
@@ -119,20 +128,24 @@ class _DurationPopupState extends State<DurationPopup> {
                   ),
                 ),
                 onPressed: () {
+                  final selectedDuration = durations[_selectedIndex]["label"]!;
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => MeditationPlayerPage(
-                              duration: durations[_selectedIndex]["label"]!,
-                            )),
+                      builder: (_) => MeditationPlayerPage(
+                        audioUrl: widget.audioUrl,
+                        duration: selectedDuration,
+                      ),
+                    ),
                   );
                 },
                 child: const Text(
                   "Start Meditation",
                   style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16),
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             )
