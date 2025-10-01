@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_drawer.dart';
 import 'duration_popup.dart';
 import 'widgets/vimeo_player_widget.dart';
+import 'test_question.dart'; // 👈 Import del test
 
 class BeHereNowPage extends StatefulWidget {
   const BeHereNowPage({super.key});
@@ -258,6 +259,15 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
                         context: context,
                         builder: (_) =>
                             DurationPopup(audioUrl: _deepSleepAudioUrl!),
+                      );
+                    } else if (card["title"] == "Mindfulness Test") {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TestQuestionPage(
+                            testId: "06d15c08-1493-40da-907f-a8ce4eb11c77",
+                          ),
+                        ),
                       );
                     }
                   },
