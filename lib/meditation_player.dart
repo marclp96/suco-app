@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'after_meditation_popup.dart'; // 👈 Import del popup post-meditación
 
 class MeditationPlayerPage extends StatefulWidget {
   final String audioUrl;
@@ -73,27 +74,11 @@ class _MeditationPlayerPageState extends State<MeditationPlayerPage> {
     });
 
     if (mounted) {
+      // 👇 Mostrar el AfterMeditationPopup en lugar del AlertDialog
       showDialog(
         context: context,
-        builder: (_) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
-          title: const Text("Session Complete",
-              style: TextStyle(color: Colors.white)),
-          content: const Text(
-            "Your meditation session has ended.",
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // cerrar dialog
-                Navigator.pop(context); // volver atrás
-              },
-              child: const Text("OK",
-                  style: TextStyle(color: Color(0xFFCBFBC7))),
-            )
-          ],
-        ),
+        barrierDismissible: false,
+        builder: (_) => AfterMeditationPopup(), // 🔹 sin const
       );
     }
   }
@@ -116,7 +101,24 @@ class _MeditationPlayerPageState extends State<MeditationPlayerPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
-        title: const Text("Meditation Player"),
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: Color(0xFF333333),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+          ),
+        ),
+        title: const Text(
+          "Meditation Player",
+          style: TextStyle(color: Colors.white),
+        ),
+        centerTitle: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
