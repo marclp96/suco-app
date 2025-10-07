@@ -49,7 +49,11 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
             _videoId = match.group(1);
             _loadingVideo = false;
           });
+        } else {
+          setState(() => _loadingVideo = false);
         }
+      } else {
+        setState(() => _loadingVideo = false);
       }
     } catch (e) {
       debugPrint("❌ Error fetching video: $e");
@@ -57,7 +61,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     }
   }
 
-  // 🔹 Audio Be Here Now desde media_content
+  // 🔹 Audio Be Here Now
   Future<void> _fetchBeHereNowAudio() async {
     try {
       final supabase = Supabase.instance.client;
@@ -84,7 +88,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     }
   }
 
-  // 🔹 Audio Deep Sleep desde media_content
+  // 🔹 Audio Deep Sleep
   Future<void> _fetchDeepSleepAudio() async {
     try {
       final supabase = Supabase.instance.client;
@@ -111,6 +115,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     }
   }
 
+  // 🔹 Header
   Widget _buildHeader(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -156,6 +161,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     );
   }
 
+  // 🔹 Hero Video Section (Vimeo)
   Widget _buildHeroVideo() {
     if (_loadingVideo) {
       return const Center(
@@ -178,6 +184,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
       );
     }
 
+    // ✅ VimeoPlayerWidget actualizado (funciona en iOS / Android / Web)
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       height: 220,
@@ -189,10 +196,12 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
       child: VimeoPlayerWidget(
         videoId: _videoId!,
         autoPlay: true,
+        loop: false, // Puedes poner true si quieres que repita
       ),
     );
   }
 
+  // 🔹 Intro Text
   Widget _buildIntroText() {
     return const Padding(
       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -221,6 +230,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     );
   }
 
+  // 🔹 Video Sections
   Widget _buildVideoSection({
     required String title,
     required List<Map<String, String>> cards,

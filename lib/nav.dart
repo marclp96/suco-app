@@ -65,23 +65,25 @@ class AppCenterFAB extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: const BoxDecoration(
-        color: Color(0xFFCBFBC7),
-        shape: BoxShape.circle,
-      ),
+    return SizedBox(
+      width: 60,
+      height: 60,
       child: FloatingActionButton(
         onPressed: onPressed,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          child: Image.network(
+        backgroundColor: const Color(0xFFCBFBC7),
+        elevation: 6,
+        shape: const CircleBorder(),
+        child: ClipOval(
+          child: Image.asset(
             'assets/images/Suco-DarkGreyIcon.png',
-            width: 24,
-            height: 24,
+            width: 28,
+            height: 28,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => const Icon(
+              Icons.person,
+              color: Colors.black,
+              size: 30,
+            ),
           ),
         ),
       ),

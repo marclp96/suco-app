@@ -8,7 +8,8 @@ import 'profile.dart';
 import 'be_here_now.dart';
 import 'app_drawer.dart';
 import 'team_list.dart';
-import 'widgets/vimeo_player_widget.dart'; // ✅ ruta correcta
+import 'widgets/vimeo_player_widget.dart';
+import 'test_question.dart'; // ✅ para lanzar los tests
 
 class JourneyPage extends StatefulWidget {
   const JourneyPage({super.key});
@@ -20,26 +21,110 @@ class JourneyPage extends StatefulWidget {
 class _JourneyPageState extends State<JourneyPage> {
   int _selectedIndex = 2;
   String? _videoId;
+  bool _loadingVideo = true;
+
+  List<String> _completedItems = [];
+  bool _loadingProgress = true;
 
   @override
   void initState() {
     super.initState();
     _loadIntroVideo();
+    _loadUserProgress();
   }
 
   Future<void> _loadIntroVideo() async {
-    final response = await Supabase.instance.client
-        .from('journey')
-        .select('intro_video_url')
-        .maybeSingle();
+    try {
+      final response = await Supabase.instance.client
+          .from('journey')
+          .select('intro_video_url')
+          .maybeSingle();
 
-    if (response != null && response['intro_video_url'] != null) {
-      final url = response['intro_video_url'] as String;
-      final regex = RegExp(r'vimeo\.com/(\d+)');
-      final match = regex.firstMatch(url);
+      if (response != null && response['intro_video_url'] != null) {
+        final url = response['intro_video_url'] as String;
+        final regex = RegExp(r'vimeo\.com/(\d+)');
+        final match = regex.firstMatch(url);
+
+        setState(() {
+          _videoId = match != null ? match.group(1)! : null;
+          _loadingVideo = false;
+        });
+      } else {
+        setState(() => _loadingVideo = false);
+      }
+    } catch (e) {
+      debugPrint("❌ Error loading intro video: $e");
+      setState(() => _loadingVideo = false);
+    }
+  }
+
+  /// 🟢 Cargar progreso (meditaciones y tests) desde journey_session_log
+  Future<void> _loadUserProgress() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final response = await supabase
+          .from('journey_session_log')
+          .select('meditation_id')
+          .eq('user_id', user.id)
+          .eq('completed', true);
+
       setState(() {
-        _videoId = match != null ? match.group(1)! : url;
+        _completedItems =
+            List<String>.from(response.map((e) => e['meditation_id'].toString()));
+        _loadingProgress = false;
       });
+    } catch (e) {
+      debugPrint("⚠️ Error loading user progress: $e");
+      setState(() => _loadingProgress = false);
+    }
+  }
+
+  /// 🟢 Guardar meditación completada
+  Future<void> _markMeditationComplete(String meditationId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      await supabase.from('journey_session_log').insert({
+        'user_id': user.id,
+        'meditation_id': meditationId,
+        'completed': true,
+        'duration': 15,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      setState(() {
+        _completedItems.add(meditationId);
+      });
+    } catch (e) {
+      debugPrint("⚠️ Error saving meditation progress: $e");
+    }
+  }
+
+  /// 🟢 Guardar test completado
+  Future<void> _markTestComplete(String testId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      await supabase.from('journey_session_log').insert({
+        'user_id': user.id,
+        'meditation_id': testId, // reutilizamos el campo
+        'completed': true,
+        'duration': 0,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      setState(() {
+        _completedItems.add(testId);
+      });
+    } catch (e) {
+      debugPrint("⚠️ Error saving test progress: $e");
     }
   }
 
@@ -70,36 +155,39 @@ class _JourneyPageState extends State<JourneyPage> {
     );
   }
 
+  /// 🟢 Mostrar vídeo intro
   void _showIntroVideo(BuildContext context) {
-    if (_videoId == null) return;
+    if (_videoId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No intro video found')),
+      );
+      return;
+    }
 
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: "Intro Video",
+      transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (context, anim1, anim2) {
         return Scaffold(
           backgroundColor: Colors.transparent,
           body: Stack(
             children: [
-              // Fondo difuminado
               BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(color: Colors.black.withOpacity(0.5)),
+                child: Container(color: Colors.black.withOpacity(0.6)),
               ),
-
-              // Vídeo centrado (igual que en Be Here Now)
               Center(
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: VimeoPlayerWidget(
                     videoId: _videoId!,
                     autoPlay: true,
+                    loop: false,
                   ),
                 ),
               ),
-
-              // Botón de cerrar
               Positioned(
                 top: 40,
                 right: 20,
@@ -118,76 +206,101 @@ class _JourneyPageState extends State<JourneyPage> {
     );
   }
 
+  /// 🟢 Abrir meditación y registrar progreso
+  Future<void> _openMeditation(BuildContext context, String title) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BeHereNowPage()),
+    );
+    await _markMeditationComplete(title);
+  }
+
+  /// 🟢 Abrir test y registrar progreso
+  Future<void> _openTest(BuildContext context, String testId) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => TestQuestionPage(testId: testId)),
+    );
+    await _markTestComplete(testId);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
       drawer: const AppDrawer(),
       body: SafeArea(
-        child: ListView(
-          children: [
-            _buildHeader(),
-            _buildHeroBanner(),
-            _buildIntroText(),
-            _buildWatchIntroButton(),
-            const SizedBox(height: 16),
-            _buildSeriesSection(
-              title: "Connect Series",
-              description:
-                  "Learn to cultivate deeper relationships with yourself and others through mindful presence and authentic communication practices.",
-              lessons: [
-                {
-                  "title": "Be Here Now",
-                  "subtitle": "Learn to be present",
-                  "locked": false
-                },
-                {
-                  "title": "Connect to Self",
-                  "subtitle": "Learn to Connect",
-                  "locked": true
-                },
-                {
-                  "title": "Connect to Others",
-                  "subtitle": "Learn to empathize",
-                  "locked": true
-                },
-              ],
-            ),
-            _buildSeriesSection(
-              title: "Create Series",
-              description:
-                  "Learn to let go, to destress, to awaken your emotional intelligence, finding your personal state of Flow.",
-              lessons: [
-                {
-                  "title": "Let Go",
-                  "subtitle": "Learn to let go",
-                  "locked": true
-                },
-                {"title": "Feel", "subtitle": "Learn to feel", "locked": true},
-                {"title": "Play", "subtitle": "Learn to play", "locked": true},
-              ],
-            ),
-            _buildSeriesSection(
-              title: "Celebrate Series",
-              description:
-                  "Cultivate deep gratitude, body appreciation, and unity consciousness. Through celebration practices, we release endorphins and feel joy.",
-              lessons: [
-                {
-                  "title": "The Miracle of You",
-                  "subtitle": "Learn about yourself",
-                  "locked": true
-                },
-                {"title": "Unity", "subtitle": "Learn to unify", "locked": true},
-                {
-                  "title": "Gratitude for the Now",
-                  "subtitle": "Learn to be grateful",
-                  "locked": true
-                },
-              ],
-            ),
-            const SizedBox(height: 100),
-          ],
-        ),
+        child: _loadingProgress
+            ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFFCBFBC7)))
+            : ListView(
+                children: [
+                  _buildHeader(),
+                  _buildHeroBanner(),
+                  _buildIntroText(),
+                  _buildWatchIntroButton(),
+                  const SizedBox(height: 16),
+                  _buildSeriesSection(
+                    title: "Connect Series",
+                    description:
+                        "Learn to cultivate deeper relationships with yourself and others through mindful presence and authentic communication practices.",
+                    lessons: [
+                      {
+                        "title": "Be Here Now",
+                        "subtitle": "Learn to be present",
+                        "locked": false,
+                        "type": "meditation"
+                      },
+                      {
+                        "title": "Connect to Self",
+                        "subtitle": "Learn to connect",
+                        "locked": true,
+                        "type": "meditation"
+                      },
+                      {
+                        "title": "Connect to Others",
+                        "subtitle": "Learn to empathize",
+                        "locked": true,
+                        "type": "meditation"
+                      },
+                    ],
+                  ),
+                  _buildSeriesSection(
+                    title: "Create Series",
+                    description:
+                        "Learn to let go, to destress, to awaken your emotional intelligence, finding your personal state of Flow.",
+                    lessons: [
+                      {
+                        "title": "Let Go",
+                        "subtitle": "Learn to let go",
+                        "locked": true,
+                        "type": "meditation"
+                      },
+                      {"title": "Feel", "subtitle": "Learn to feel", "locked": true},
+                      {"title": "Play", "subtitle": "Learn to play", "locked": true},
+                    ],
+                  ),
+                  _buildSeriesSection(
+                    title: "Celebrate Series",
+                    description:
+                        "Cultivate deep gratitude, body appreciation, and unity consciousness. Through celebration practices, we release endorphins and feel joy.",
+                    lessons: [
+                      {
+                        "title": "The Miracle of You",
+                        "subtitle": "Learn about yourself",
+                        "locked": true
+                      },
+                      {"title": "Unity", "subtitle": "Learn to unify", "locked": true},
+                      {
+                        "title": "Gratitude for the Now",
+                        "subtitle": "Learn to be grateful",
+                        "locked": true
+                      },
+                    ],
+                  ),
+                  const SizedBox(height: 100),
+                ],
+              ),
       ),
       bottomNavigationBar: AppNavBar(
         selectedIndex: _selectedIndex,
@@ -278,17 +391,18 @@ class _JourneyPageState extends State<JourneyPage> {
         width: double.infinity,
         height: 48,
         child: ElevatedButton.icon(
-          onPressed: () => _showIntroVideo(context),
+          onPressed: _loadingVideo ? null : () => _showIntroVideo(context),
           icon: const Icon(Icons.play_arrow, color: Colors.black),
-          label: const Text(
-            "Watch Intro",
-            style: TextStyle(
+          label: Text(
+            _loadingVideo ? "Loading..." : "Watch Intro",
+            style: const TextStyle(
               color: Colors.black,
               fontWeight: FontWeight.w600,
             ),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFCBFBC7),
+            disabledBackgroundColor: Colors.grey.shade600,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(24),
             ),
@@ -313,27 +427,23 @@ class _JourneyPageState extends State<JourneyPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text(title,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          Text(
-            description,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
+          Text(description,
+              style: const TextStyle(
+                  color: Colors.white70, fontSize: 14, height: 1.4)),
           const SizedBox(height: 16),
           Column(
             children: lessons.map((lesson) {
               final locked = lesson['locked'] as bool;
+              final title = lesson['title'];
+              final completed = _completedItems.contains(title);
+              final type = lesson['type'] ?? 'meditation';
+
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
@@ -342,6 +452,9 @@ class _JourneyPageState extends State<JourneyPage> {
                       ? const Color(0xFF2A2A2A)
                       : const Color(0xFF1A1A1A),
                   borderRadius: BorderRadius.circular(12),
+                  border: completed
+                      ? Border.all(color: const Color(0xFFCBFBC7), width: 1.5)
+                      : null,
                 ),
                 child: Row(
                   children: [
@@ -349,33 +462,32 @@ class _JourneyPageState extends State<JourneyPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            lesson['title'],
-                            style: TextStyle(
-                              color: locked ? Colors.white54 : Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          Text(title,
+                              style: TextStyle(
+                                  color: completed
+                                      ? const Color(0xFFCBFBC7)
+                                      : locked
+                                          ? Colors.white54
+                                          : Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600)),
                           const SizedBox(height: 4),
-                          Text(
-                            lesson['subtitle'],
-                            style: TextStyle(
-                              color: locked ? Colors.white38 : Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
+                          Text(lesson['subtitle'],
+                              style: TextStyle(
+                                  color: locked
+                                      ? Colors.white38
+                                      : Colors.white70,
+                                  fontSize: 12)),
                         ],
                       ),
                     ),
                     GestureDetector(
-                      onTap: () {
-                        if (!locked && lesson['title'] == "Be Here Now") {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const BeHereNowPage()),
-                          );
+                      onTap: () async {
+                        if (locked) return;
+                        if (type == 'test') {
+                          await _openTest(context, title);
+                        } else {
+                          await _openMeditation(context, title);
                         }
                       },
                       child: Container(
@@ -384,15 +496,25 @@ class _JourneyPageState extends State<JourneyPage> {
                         decoration: BoxDecoration(
                           color: locked
                               ? Colors.transparent
-                              : const Color(0xFFCBFBC7),
+                              : completed
+                                  ? const Color(0xFFCBFBC7)
+                                  : const Color(0xFF333333),
                           shape: BoxShape.circle,
                           border: locked
                               ? Border.all(color: Colors.white30, width: 1)
                               : null,
                         ),
                         child: Icon(
-                          locked ? Icons.lock : Icons.play_arrow,
-                          color: locked ? Colors.white54 : Colors.black,
+                          locked
+                              ? Icons.lock
+                              : completed
+                                  ? Icons.check
+                                  : Icons.arrow_forward,
+                          color: locked
+                              ? Colors.white54
+                              : completed
+                                  ? Colors.black
+                                  : Colors.white,
                           size: 20,
                         ),
                       ),

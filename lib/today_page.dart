@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:suco_app/team_dashboard.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'nav.dart';
 import 'journey_page.dart';
 import 'live_home.dart';
 import 'profile.dart';
-import 'test_question.dart'; 
+import 'test_question.dart';
 import 'app_drawer.dart';
 import 'challenge_full.dart';
 import 'team_list.dart';
@@ -21,9 +20,7 @@ class TodayPage extends StatefulWidget {
 class _TodayPageState extends State<TodayPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  int _selectedIndex = 0; // Today
-  String _selectedMood = 'Good';
-  final TextEditingController _chatController = TextEditingController();
+  int _selectedIndex = 0;
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
 
@@ -47,12 +44,13 @@ class _TodayPageState extends State<TodayPage> {
     try {
       final supabase = Supabase.instance.client;
 
-      // ✅ Always fetch the latest reflection
+      // ✅ Get the most recent reflection that actually has an audio_url
       final resReflection = await supabase
           .from('reflections')
           .select()
+          .not('audio_url', 'is', null)
+          .not('audio_url', 'eq', '')
           .order('created_at', ascending: false)
-          .order('id', ascending: false)
           .limit(1);
 
       Map<String, dynamic>? reflection;
@@ -60,12 +58,11 @@ class _TodayPageState extends State<TodayPage> {
         reflection = Map<String, dynamic>.from(resReflection.first as Map);
       }
 
-      // ✅ Always fetch the latest challenge
+      // ✅ Latest daily challenge
       final resChallenge = await supabase
           .from('daily_challenge')
           .select()
           .order('created_at', ascending: false)
-          .order('id', ascending: false)
           .limit(1);
 
       Map<String, dynamic>? challenge;
@@ -90,7 +87,6 @@ class _TodayPageState extends State<TodayPage> {
 
   @override
   void dispose() {
-    _chatController.dispose();
     _audioPlayer.dispose();
     super.dispose();
   }
@@ -123,6 +119,89 @@ class _TodayPageState extends State<TodayPage> {
     );
   }
 
+  // 🔹 Greeting según hora + usuario Supabase
+  Widget _buildGreetingSection() {
+    final user = Supabase.instance.client.auth.currentUser;
+    final supabase = Supabase.instance.client;
+
+    return FutureBuilder(
+      future: supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user!.id)
+          .maybeSingle(),
+      builder: (context, snapshot) {
+        String greeting = _getGreeting();
+        String name = 'there';
+
+        if (snapshot.hasData && snapshot.data != null) {
+          final data = snapshot.data as Map<String, dynamic>?;
+          if (data != null && data['full_name'] != null) {
+            name = data['full_name'];
+          }
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              GestureDetector(
+                onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF333333),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.menu,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    greeting,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$name ',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Text('👋', style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,7 +223,7 @@ class _TodayPageState extends State<TodayPage> {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'Desliza hacia abajo para reintentar.',
+                          'Swipe down to refresh.',
                           style: TextStyle(color: Colors.white54),
                         ),
                       ],
@@ -181,61 +260,6 @@ class _TodayPageState extends State<TodayPage> {
     );
   }
 
-  Widget _buildGreetingSection() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          GestureDetector(
-            onTap: () {
-              _scaffoldKey.currentState?.openDrawer();
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF333333),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.menu,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Text(
-                'Good morning',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text(
-                    'Marc ',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 16,
-                    ),
-                  ),
-                  Text('👋', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildHeroBanner() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -243,7 +267,7 @@ class _TodayPageState extends State<TodayPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         image: const DecorationImage(
-          image: AssetImage('assets/images/bg-image.jpeg'), // 👈 Imagen local
+          image: AssetImage('assets/images/bg-image.jpeg'),
           fit: BoxFit.cover,
         ),
       ),
@@ -259,10 +283,10 @@ class _TodayPageState extends State<TodayPage> {
             ],
           ),
         ),
-        child: Center(
+        child: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
+            children: [
               Text(
                 'SUCO',
                 style: TextStyle(
@@ -274,18 +298,12 @@ class _TodayPageState extends State<TodayPage> {
               ),
               Text(
                 '®',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 14),
               ),
               SizedBox(height: 4),
               Text(
                 'Connect. Create. Celebrate.',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 14),
               ),
             ],
           ),
@@ -295,10 +313,9 @@ class _TodayPageState extends State<TodayPage> {
   }
 
   Widget _buildDailyReflection() {
-    final title = (_reflection?['title'] as String?)?.trim();
+    final title = (_reflection?['title'] as String?)?.trim() ?? 'Untitled';
     final transcript = (_reflection?['transcript'] as String?)?.trim();
     final audioUrl = (_reflection?['audio_url'] as String?)?.trim();
-    final hasData = _reflection != null;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -319,74 +336,82 @@ class _TodayPageState extends State<TodayPage> {
             ),
           ),
           const SizedBox(height: 16),
-          if (!hasData) ...[
-            const Text(
-              'No available reflection.',
-              style: TextStyle(color: Colors.white70),
-            ),
-          ] else ...[
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF404040),
-                    borderRadius: BorderRadius.circular(12),
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF404040),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    _isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: Colors.white,
                   ),
-                  child: IconButton(
-                    icon: Icon(
-                      _isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                    ),
-                    onPressed: () async {
+                  onPressed: () async {
+                    if (audioUrl == null || audioUrl.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No audio available.'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    try {
                       if (_isPlaying) {
                         await _audioPlayer.pause();
                         setState(() => _isPlaying = false);
-                      } else if (audioUrl != null && audioUrl.isNotEmpty) {
+                      } else {
+                        await _audioPlayer.stop();
                         await _audioPlayer.play(UrlSource(audioUrl));
                         setState(() => _isPlaying = true);
+
+                        _audioPlayer.onPlayerComplete.listen((_) {
+                          setState(() => _isPlaying = false);
+                        });
                       }
-                    },
-                  ),
+                    } catch (e) {
+                      debugPrint("❌ Error playing audio: $e");
+                    }
+                  },
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        (title == null || title.isEmpty) ? 'Untitled' : title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Text(
-                        'Listen to today\'s wisdom',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              (transcript == null || transcript.isEmpty)
-                  ? 'No transcript available for this reflection.'
-                  : transcript,
-              style: TextStyle(
-                color: Colors.grey[300],
-                fontSize: 14,
-                height: 1.5,
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Text(
+                      "Listen to today's wisdom",
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            (transcript == null || transcript.isEmpty)
+                ? 'No transcript available for this reflection.'
+                : transcript,
+            style: TextStyle(
+              color: Colors.grey[300],
+              fontSize: 14,
+              height: 1.5,
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -424,10 +449,10 @@ class _TodayPageState extends State<TodayPage> {
                         color: Colors.white, size: 18),
                   ),
                   const SizedBox(width: 12),
-                  Column(
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Daily Challenge',
                         style: TextStyle(
                           color: Colors.black,
@@ -437,10 +462,7 @@ class _TodayPageState extends State<TodayPage> {
                       ),
                       Text(
                         'Join the movement',
-                        style: TextStyle(
-                          color: Colors.black.withOpacity(0.7),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.black54, fontSize: 12),
                       ),
                     ],
                   ),
@@ -499,8 +521,8 @@ class _TodayPageState extends State<TodayPage> {
 
   Widget _buildMindfulnessTestCarousel() {
     final images = [
-      'assets/images/carousel1.jpeg', // 👈 primera imagen local
-      'assets/images/carousel2.jpeg', // 👈 segunda imagen local
+      'assets/images/carousel1.jpeg',
+      'assets/images/carousel2.jpeg',
     ];
 
     return Container(
@@ -572,7 +594,7 @@ class _TodayPageState extends State<TodayPage> {
                           MaterialPageRoute(
                             builder: (_) => TestQuestionPage(
                               testId:
-                                  "06d15c08-1493-40da-907f-a8ce4eb11c77", 
+                                  "06d15c08-1493-40da-907f-a8ce4eb11c77",
                             ),
                           ),
                         );

@@ -4,7 +4,7 @@ import 'test_results.dart';
 import 'app_drawer.dart';
 
 class TestQuestionPage extends StatefulWidget {
-  final String testId; // 👈 recibe el ID del test
+  final String testId;
 
   const TestQuestionPage({super.key, required this.testId});
 
@@ -18,7 +18,7 @@ class _TestQuestionPageState extends State<TestQuestionPage> {
   List<Map<String, dynamic>> _questions = [];
   int _currentIndex = 0;
   String? _selectedKey;
-  final Map<String, int> _answersCount = {}; // para contar keys elegidos
+  final Map<String, int> _answersCount = {};
   bool _loading = true;
 
   @override
@@ -35,15 +35,42 @@ class _TestQuestionPageState extends State<TestQuestionPage> {
         .order('created_at', ascending: true);
 
     setState(() {
-      _questions =
-          response.map<Map<String, dynamic>>((q) => Map<String, dynamic>.from(q)).toList();
+      _questions = response
+          .map<Map<String, dynamic>>((q) => Map<String, dynamic>.from(q))
+          .toList();
       _loading = false;
     });
   }
 
-  void _nextQuestion() {
+  // guarda sesión de test completado 
+  Future<void> _saveTestSession() async {
+  try {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      debugPrint("⚠️ No user logged in");
+      return;
+    }
+
+    // Forzamos que el ID guardado sea exactamente el auth.uid()
+    final userId = user.id;
+
+    await supabase.from('journey_session_log').insert({
+      'user_id': userId,
+      'completed': true,
+      'duration': 10, // duración estimada del test
+      'date': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    debugPrint("✅ Test completion logged in journey_session_log with user_id: $userId");
+  } catch (e) {
+    debugPrint("❌ Error saving test session: $e");
+  }
+}
+
+
+  void _nextQuestion() async {
     if (_selectedKey != null) {
-      // contar respuesta
       _answersCount[_selectedKey!] = (_answersCount[_selectedKey!] ?? 0) + 1;
 
       if (_currentIndex < _questions.length - 1) {
@@ -52,17 +79,21 @@ class _TestQuestionPageState extends State<TestQuestionPage> {
           _selectedKey = null;
         });
       } else {
-        // calcular resultado
-        final winningKey = _answersCount.entries
-            .reduce((a, b) => a.value >= b.value ? a : b)
-            .key;
+        // 🧘 Usuario completó el test → guardamos sesión
+        await _saveTestSession();
+
+        final maxCount = _answersCount.values.reduce((a, b) => a > b ? a : b);
+        final winningKeys = _answersCount.entries
+            .where((e) => e.value == maxCount)
+            .map((e) => e.key)
+            .toList();
 
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => TestResultsPage(
               testId: widget.testId,
-              resultKey: winningKey,
+              resultKeys: winningKeys,
             ),
           ),
         );
@@ -91,7 +122,10 @@ class _TestQuestionPageState extends State<TestQuestionPage> {
     if (_questions.isEmpty) {
       return const Scaffold(
         backgroundColor: Color(0xFF1A1A1A),
-        body: Center(child: Text("No questions available", style: TextStyle(color: Colors.white))),
+        body: Center(
+          child: Text("No questions available",
+              style: TextStyle(color: Colors.white)),
+        ),
       );
     }
 
@@ -128,9 +162,9 @@ class _TestQuestionPageState extends State<TestQuestionPage> {
           icon: Icons.arrow_back,
           onTap: () => Navigator.of(context).pop(),
         ),
-        Text(
+        const Text(
           'Mindfulness Test',
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontSize: 22,
             fontWeight: FontWeight.w700,
@@ -179,7 +213,7 @@ class _TestQuestionPageState extends State<TestQuestionPage> {
           Expanded(
             child: ListView.separated(
               itemCount: options.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 16),
+              separatorBuilder: (_, __) => const SizedBox(height: 20),
               itemBuilder: (context, index) {
                 final option = options[index];
                 final key = option['key'];
@@ -222,8 +256,7 @@ class _TestQuestionPageState extends State<TestQuestionPage> {
   }
 }
 
-// ⬇️ Reutilizamos tus componentes previos (RoundedIconButton, ProgressBar, OptionTile, PrimaryButton, SecondaryButton)
-
+// 🔹 Rounded Icon Button
 class RoundedIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -237,8 +270,8 @@ class RoundedIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 56,
-      height: 56,
+      width: 52,
+      height: 52,
       decoration: const BoxDecoration(
         color: Color(0xFF333333),
         shape: BoxShape.circle,
@@ -246,15 +279,16 @@ class RoundedIconButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(26),
           onTap: onTap,
-          child: Icon(icon, color: Colors.white, size: 24),
+          child: Icon(icon, color: Colors.white, size: 22),
         ),
       ),
     );
   }
 }
 
+// 🔹 Progress bar
 class ProgressBar extends StatelessWidget {
   final double value;
 
@@ -282,6 +316,7 @@ class ProgressBar extends StatelessWidget {
   }
 }
 
+// 🔹 Option tile
 class OptionTile extends StatelessWidget {
   final String label;
   final bool selected;
@@ -297,10 +332,10 @@ class OptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 84,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       decoration: BoxDecoration(
         color: selected ? const Color(0xFF2A2A2A) : const Color(0xFF1F1F1F),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         border: selected
             ? Border.all(color: const Color(0xFFCBFBC7), width: 2)
             : null,
@@ -308,17 +343,18 @@ class OptionTile extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           splashColor: const Color(0xFFCBFBC7).withOpacity(0.1),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: Text(
               label,
               style: TextStyle(
                 color: selected ? Colors.white : Colors.white70,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
+                fontSize: 17,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
               ),
             ),
           ),
@@ -328,6 +364,7 @@ class OptionTile extends StatelessWidget {
   }
 }
 
+// 🔹 Primary Button
 class PrimaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
@@ -341,19 +378,19 @@ class PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 64,
+      height: 52,
       child: Material(
         color: const Color(0xFFCBFBC7),
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(26),
         child: InkWell(
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(26),
           onTap: onTap,
           child: Center(
             child: Text(
               text,
               style: const TextStyle(
                 color: Colors.black,
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -364,6 +401,7 @@ class PrimaryButton extends StatelessWidget {
   }
 }
 
+// 🔹 Secondary Button
 class SecondaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
@@ -377,10 +415,10 @@ class SecondaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 64,
+      height: 52,
       decoration: BoxDecoration(
         color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(26),
         border: Border.all(
           color: const Color(0xFFCBFBC7).withOpacity(0.6),
           width: 1.5,
@@ -389,14 +427,14 @@ class SecondaryButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(26),
           onTap: onTap,
           child: Center(
             child: Text(
               text,
               style: const TextStyle(
                 color: Color(0xFFCBFBC7),
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
             ),

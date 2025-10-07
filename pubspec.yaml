@@ -1,6 +1,6 @@
 name: suco_app
 description: "A new Flutter project."
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: 'none'
 
 version: 1.0.0+1
 
@@ -24,12 +24,9 @@ dependencies:
   share_plus: ^7.2.1
   qr_flutter: ^4.1.0
   qr_code_scanner: ^1.0.1
-
-  
-  # Aquí van tus librerías externas 👇
   supabase_flutter: ^2.5.6
-
   cupertino_icons: ^1.0.8
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -54,5 +51,21 @@ flutter:
     - assets/images/breathwork-session.jpeg
     - assets/images/challenge_full.jpeg
     - assets/images/Suco-Lime.png
-    
+    - assets/fonts/
 
+  fonts:
+    - family: BDOGrotesk
+      fonts:
+        - asset: assets/fonts/BDOGrotesk-Regular.ttf
+
+    - family: NeueHaasUnica
+      fonts:
+        - asset: assets/fonts/Neue Haas Unica W1G Heavy.ttf
+          weight: 800
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/icons/icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true

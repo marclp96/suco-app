@@ -80,7 +80,7 @@ class AppDrawer extends StatelessWidget {
                     context,
                     Icons.notifications_none,
                     "Notifications",
-                    trailing: _buildBadge("02"),
+                    trailing: _buildBadge(""),
                     onTap: () => _navigate(
                       context,
                       const PlaceholderPage(title: "Notifications"),
@@ -220,7 +220,7 @@ class PlaceholderPage extends StatelessWidget {
       ),
       body: Center(
         child: Text(
-          "$title Page (coming soon)",
+          "Coming soon!",
           style: const TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),

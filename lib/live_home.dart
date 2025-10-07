@@ -8,6 +8,7 @@ import 'today_page.dart';
 import 'journey_page.dart';
 import 'profile.dart';
 import 'team_list.dart';
+import 'app_drawer.dart';
 
 class LiveHomePage extends StatefulWidget {
   const LiveHomePage({super.key});
@@ -17,6 +18,7 @@ class LiveHomePage extends StatefulWidget {
 }
 
 class _LiveHomePageState extends State<LiveHomePage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 3; // Live
 
   void _onNavTapped(int index) {
@@ -48,10 +50,10 @@ class _LiveHomePageState extends State<LiveHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    print(">>> Entrando a LiveHomePage build");
-
     return Scaffold(
+      key: _scaffoldKey, // 👈 necesario para abrir el Drawer
       backgroundColor: const Color(0xFF1A1A1A),
+      drawer: const AppDrawer(), // 👈 Drawer real
       body: FutureBuilder<List>(
         future: Supabase.instance.client.from('events').select(),
         builder: (context, snapshot) {
@@ -73,14 +75,12 @@ class _LiveHomePageState extends State<LiveHomePage> {
             );
           }
 
-          // Normalizamos eventos
           final parsedEvents = events.map((e) {
             final event = Map<String, dynamic>.from(e);
             event['parsedDate'] = DateTime.parse(event['date']).toLocal();
             return event;
           }).toList();
 
-          // Crear mapa de días con evento
           final Map<String, bool> eventDays = {};
           for (final e in parsedEvents) {
             final date = e['parsedDate'] as DateTime;
@@ -89,11 +89,9 @@ class _LiveHomePageState extends State<LiveHomePage> {
             eventDays[key] = true;
           }
 
-          // Ordenar eventos
           parsedEvents.sort(
               (a, b) => (a['parsedDate'] as DateTime).compareTo(b['parsedDate']));
 
-          // Buscar el próximo evento futuro
           final now = DateTime.now();
           final upcoming = parsedEvents
               .where((e) => (e['parsedDate'] as DateTime).isAfter(now))
@@ -131,6 +129,7 @@ class _LiveHomePageState extends State<LiveHomePage> {
     );
   }
 
+  // ✅ HEADER con botón de menú funcional
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -158,23 +157,26 @@ class _LiveHomePageState extends State<LiveHomePage> {
               ),
             ],
           ),
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Color(0xFF333333),
-              borderRadius: BorderRadius.circular(12),
+          GestureDetector(
+            onTap: () {
+              _scaffoldKey.currentState?.openDrawer(); // 👈 abre el Drawer
+            },
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF333333),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.menu, color: Colors.white, size: 20),
             ),
-            child: const Icon(Icons.menu, color: Colors.white, size: 20),
           ),
         ],
       ),
     );
   }
 
-  /// =========================
-  /// 🌟 HERO CARD DINÁMICO
-  /// =========================
+  /// 🌟 HERO CARD
   Widget _buildHeroCard(Map<String, dynamic> event) {
     final date = event['parsedDate'] as DateTime;
     final formatted = DateFormat("dd MMM, HH:mm").format(date);
@@ -279,9 +281,7 @@ class _LiveHomePageState extends State<LiveHomePage> {
     );
   }
 
-  /// =========================
   /// 📅 CALENDARIO
-  /// =========================
   Widget _buildCalendar(Map<String, bool> eventDays) {
     final now = DateTime.now();
     final firstDayOfMonth = DateTime(now.year, now.month, 1);
@@ -414,9 +414,7 @@ class _LiveHomePageState extends State<LiveHomePage> {
     return months[month - 1];
   }
 
-  /// =========================
   /// 📋 UPCOMING EVENTS
-  /// =========================
   Widget _buildUpcomingEvents(List<Map<String, dynamic>> events) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
@@ -502,22 +500,6 @@ class _LiveHomePageState extends State<LiveHomePage> {
             }).toList(),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class PlaceholderPage extends StatelessWidget {
-  final String title;
-  const PlaceholderPage({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(title, style: const TextStyle(color: Colors.white)),
       ),
     );
   }

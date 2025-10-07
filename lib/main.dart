@@ -5,9 +5,14 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart'; // 🔹 Import OneSignal
 import 'package:flutter/foundation.dart' show kIsWeb; // 🔹 Para detectar Web
+
+// 🔹 Tus páginas
 import 'today_page.dart';
 import 'login_page.dart';
 import 'profile.dart';
+
+// 🔹 Importa el tema global
+import 'theme/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,10 +69,7 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'SUCO',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-      ),
+      theme: AppTheme.lightTheme, // 👈 Aquí aplicamos tu theme global
       routes: {
         '/profile': (context) => const ProfilePage(),
       },

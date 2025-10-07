@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AfterMeditationPopup extends StatefulWidget {
+  final int duration; // minutos de la sesión
+
+  const AfterMeditationPopup({super.key, this.duration = 15});
+
   @override
   State<AfterMeditationPopup> createState() => _AfterMeditationPopupState();
 }
@@ -8,6 +13,54 @@ class AfterMeditationPopup extends StatefulWidget {
 class _AfterMeditationPopupState extends State<AfterMeditationPopup> {
   double _moodValue = 1;
   final TextEditingController _gratitudeController = TextEditingController();
+  final supabase = Supabase.instance.client;
+  bool _saving = false;
+
+  Future<void> _saveReflection() async {
+    try {
+      setState(() => _saving = true);
+
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        debugPrint("⚠️ No authenticated user found.");
+        return;
+      }
+
+      // 🔹 Mapa de estado de ánimo
+      final moods = ["Struggling", "Content", "Ecstatic"];
+      final selectedMood = moods[_moodValue.toInt()];
+
+      // 🔹 Guardar sesión en journey_session_log
+      await supabase.from('journey_session_log').insert({
+        'user_id': user.id,
+        'duration': widget.duration,
+        'date': DateTime.now().toIso8601String(),
+        'completed': true,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // 🔹 Guardar reflexión en reflections
+      await supabase.from('reflections').insert({
+        'user_id': user.id,
+        'mood': selectedMood,
+        'gratitude': _gratitudeController.text.trim(),
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      debugPrint("✅ Meditation session and reflection saved successfully.");
+      Navigator.pop(context);
+    } catch (e) {
+      debugPrint("❌ Error saving meditation/reflection: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Error saving reflection. Please try again."),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,13 +155,16 @@ class _AfterMeditationPopupState extends State<AfterMeditationPopup> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24)),
                   ),
-                  onPressed: () {
-                    // TODO: save reflection to Supabase
-                    Navigator.pop(context);
-                  },
-                  child: const Text("Save Reflection",
-                      style: TextStyle(
-                          color: Colors.black, fontWeight: FontWeight.bold)),
+                  onPressed: _saving ? null : _saveReflection,
+                  child: _saving
+                      ? const CircularProgressIndicator(
+                          color: Colors.black, strokeWidth: 2)
+                      : const Text(
+                          "Save Reflection",
+                          style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
               const SizedBox(height: 12),

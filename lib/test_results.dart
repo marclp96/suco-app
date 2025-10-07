@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'be_here_now.dart'; 
 
 class TestResultsPage extends StatefulWidget {
   final String testId;
-  final String resultKey;
+  final List<String> resultKeys; 
 
   const TestResultsPage({
     super.key,
     required this.testId,
-    required this.resultKey,
+    required this.resultKeys,
   });
 
   @override
@@ -17,55 +18,90 @@ class TestResultsPage extends StatefulWidget {
 
 class _TestResultsPageState extends State<TestResultsPage> {
   final supabase = Supabase.instance.client;
-
-  Map<String, dynamic>? _result;
+  List<Map<String, dynamic>> _results = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadResult();
+    _loadResults();
   }
 
-  Future<void> _loadResult() async {
+  Future<void> _loadResults() async {
     final response = await supabase
         .from('test_result_types')
         .select()
         .eq('test_id', widget.testId)
-        .eq('result_key', widget.resultKey)
-        .maybeSingle();
+        .inFilter('result_key', widget.resultKeys);
 
     setState(() {
-      _result = response;
+      _results = List<Map<String, dynamic>>.from(response);
       _loading = false;
     });
   }
 
+  /// resultado del test y redirige a la meditación recomendada
+  Future<void> _saveResultAndNavigate() async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("No user logged in")),
+        );
+        return;
+      }
+
+      // meditación Be Here Now
+      final beHereNow = await supabase
+          .from('meditations')
+          .select('id')
+          .eq('title', 'Be Here Now')
+          .maybeSingle();
+
+      // guarda resultado del test
+      await supabase.from('user_test_results').insert({
+        'user_id': user.id,
+        'test_id': widget.testId,
+        'result_key': widget.resultKeys.join(','),
+        'recommended_meditation_id': beHereNow?['id'],
+      });
+
+      // Navega a la meditación
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const BeHereNowPage()),
+      );
+    } catch (e) {
+      debugPrint("❌ Error saving result: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error saving result: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isMix = widget.resultKeys.length > 1;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : _result == null
+            : _results.isEmpty
                 ? const Center(
-                    child: Text("No result found",
+                    child: Text("No results found",
                         style: TextStyle(color: Colors.white)))
                 : Column(
                     children: [
-                      _buildHeader(context),
+                      _buildHeader(context, isMix),
                       Expanded(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.all(24),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildResultCard(
-                                _result!['title'] ?? "Unknown",
-                                _result!['description'] ??
-                                    "No description available",
-                              ),
+                              _buildResultCard(isMix),
                               const SizedBox(height: 32),
                               _buildActionButtons(),
                               const SizedBox(height: 24),
@@ -79,7 +115,7 @@ class _TestResultsPageState extends State<TestResultsPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, bool isMix) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
@@ -89,48 +125,84 @@ class _TestResultsPageState extends State<TestResultsPage> {
             icon: Icons.arrow_back,
             onTap: () => Navigator.of(context).pop(),
           ),
-          const Text(
-            'Mindfulness Test Result',
-            style: TextStyle(
+          Text(
+            isMix ? 'Your Combined Type' : 'Mindfulness Test Result',
+            style: const TextStyle(
               color: Colors.white,
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.w700,
             ),
           ),
-          RoundedIconButton(
+          const RoundedIconButton(
             icon: Icons.share,
-            onTap: () {}, // 👈 aquí podrías implementar compartir
+            onTap: null,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildResultCard(String title, String description) {
-    return CardContainer(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
+  Widget _buildResultCard(bool isMix) {
+    if (!isMix) {
+      final result = _results.first;
+      return CardContainer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              result['title'] ?? "Unknown Type",
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            description,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-              height: 1.5,
+            const SizedBox(height: 16),
+            Text(
+              result['description'] ?? "No description available",
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+                height: 1.5,
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    } else {
+      // fusionar resultados
+      final titles = _results.map((r) => r['title']).join(' and ');
+      final descriptions = _results
+          .map((r) => r['description'])
+          .where((d) => d != null && d.toString().isNotEmpty)
+          .join(' ');
+
+      return CardContainer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "You are a mix of $titles",
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              descriptions,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildActionButtons() {
@@ -138,21 +210,18 @@ class _TestResultsPageState extends State<TestResultsPage> {
       children: [
         PrimaryButton(
           text: 'Start Guided Practice',
-          onTap: () {
-            // 👈 aquí podrías enlazar con una meditación recomendada
-          },
+          onTap: _saveResultAndNavigate, 
         ),
         const SizedBox(height: 16),
-        SecondaryButton(
-          text: 'View Detailed Report 👑',
-          onTap: () {},
-        ),
+        // SecondaryButton(
+        //   text: 'View Detailed Report 👑',
+        //   onTap: () {},
+        // ),
       ],
     );
   }
 }
 
-// Reusable card container
 class CardContainer extends StatelessWidget {
   final Widget child;
 
@@ -172,15 +241,14 @@ class CardContainer extends StatelessWidget {
   }
 }
 
-// Rounded Icon Button
 class RoundedIconButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const RoundedIconButton({
     super.key,
     required this.icon,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
@@ -204,7 +272,6 @@ class RoundedIconButton extends StatelessWidget {
   }
 }
 
-// Primary button
 class PrimaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
@@ -245,7 +312,6 @@ class PrimaryButton extends StatelessWidget {
   }
 }
 
-// Secondary button
 class SecondaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
