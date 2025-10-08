@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'be_here_now.dart'; 
+import 'duration_popup.dart'; // 👈 Abre el popup antes de la meditación
 
 class TestResultsPage extends StatefulWidget {
   final String testId;
-  final List<String> resultKeys; 
+  final List<String> resultKeys;
 
   const TestResultsPage({
     super.key,
@@ -21,6 +21,10 @@ class _TestResultsPageState extends State<TestResultsPage> {
   List<Map<String, dynamic>> _results = [];
   bool _loading = true;
 
+  // IDs de las meditaciones según el tipo de resultado
+  static const String meditation1Id = "f26bfa2b-6df5-4517-bf5d-fae38161321a";
+  static const String meditation2Id = "e5df0b0e-0cbd-46d1-9434-e75b96ca367c";
+
   @override
   void initState() {
     super.initState();
@@ -28,11 +32,14 @@ class _TestResultsPageState extends State<TestResultsPage> {
   }
 
   Future<void> _loadResults() async {
+    // 🔹 Limitar el resultado a máximo 2 tipos
+    final limitedKeys = widget.resultKeys.take(2).toList();
+
     final response = await supabase
         .from('test_result_types')
         .select()
         .eq('test_id', widget.testId)
-        .inFilter('result_key', widget.resultKeys);
+        .inFilter('result_key', limitedKeys);
 
     setState(() {
       _results = List<Map<String, dynamic>>.from(response);
@@ -40,7 +47,7 @@ class _TestResultsPageState extends State<TestResultsPage> {
     });
   }
 
-  /// resultado del test y redirige a la meditación recomendada
+  /// 🔹 Guarda el resultado, asocia meditación y abre el selector de duración
   Future<void> _saveResultAndNavigate() async {
     try {
       final user = supabase.auth.currentUser;
@@ -51,28 +58,68 @@ class _TestResultsPageState extends State<TestResultsPage> {
         return;
       }
 
-      // meditación Be Here Now
-      final beHereNow = await supabase
+      // Determinar meditación según tipo de resultado
+      String? selectedMeditationId;
+      if (widget.resultKeys.any((key) => ["A", "B", "C"].contains(key))) {
+        selectedMeditationId = meditation1Id;
+      } else if (widget.resultKeys.any((key) => ["D", "E", "F"].contains(key))) {
+        selectedMeditationId = meditation2Id;
+      }
+
+      if (selectedMeditationId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("No matching meditation found")),
+        );
+        return;
+      }
+
+      // 🔹 Obtener el primer media_id real desde la meditación
+      final meditationData = await supabase
           .from('meditations')
-          .select('id')
-          .eq('title', 'Be Here Now')
+          .select('media_content')
+          .eq('id', selectedMeditationId)
           .maybeSingle();
 
-      // guarda resultado del test
-      await supabase.from('user_test_results').insert({
+      if (meditationData == null ||
+          meditationData['media_content'] == null ||
+          meditationData['media_content'].isEmpty) {
+        throw Exception("No media content found for meditation");
+      }
+
+      final mediaId = meditationData['media_content'][0];
+
+      // 🔹 Buscar URL en media_versions usando el ID del media real
+      final mediaVersion = await supabase
+          .from('media_versions')
+          .select('url')
+          .eq('media_id', mediaId)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      final meditationUrl = mediaVersion?['url'];
+      if (meditationUrl == null) {
+        throw Exception("No media URL found for meditation $selectedMeditationId");
+      }
+
+      // 🔹 Guardar progreso en journey_session_log
+      await supabase.from('journey_session_log').insert({
         'user_id': user.id,
-        'test_id': widget.testId,
-        'result_key': widget.resultKeys.join(','),
-        'recommended_meditation_id': beHereNow?['id'],
+        'meditation_id': selectedMeditationId,
+        'completed': true,
+        'created_at': DateTime.now().toIso8601String(),
       });
 
-      // Navega a la meditación
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const BeHereNowPage()),
-      );
+      // 🔹 Mostrar popup de duración
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => DurationPopup(audioUrl: meditationUrl),
+        );
+      }
     } catch (e) {
-      debugPrint("❌ Error saving result: $e");
+      debugPrint("❌ Error saving test result: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error saving result: $e")),
       );
@@ -81,7 +128,7 @@ class _TestResultsPageState extends State<TestResultsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isMix = widget.resultKeys.length > 1;
+    final isMix = _results.length == 2;
 
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
@@ -170,8 +217,7 @@ class _TestResultsPageState extends State<TestResultsPage> {
         ),
       );
     } else {
-      // fusionar resultados
-      final titles = _results.map((r) => r['title']).join(' and ');
+      final titles = _results.map((r) => r['title']).join(' & ');
       final descriptions = _results
           .map((r) => r['description'])
           .where((d) => d != null && d.toString().isNotEmpty)
@@ -210,13 +256,9 @@ class _TestResultsPageState extends State<TestResultsPage> {
       children: [
         PrimaryButton(
           text: 'Start Guided Practice',
-          onTap: _saveResultAndNavigate, 
+          onTap: _saveResultAndNavigate,
         ),
         const SizedBox(height: 16),
-        // SecondaryButton(
-        //   text: 'View Detailed Report 👑',
-        //   onTap: () {},
-        // ),
       ],
     );
   }
@@ -224,7 +266,6 @@ class _TestResultsPageState extends State<TestResultsPage> {
 
 class CardContainer extends StatelessWidget {
   final Widget child;
-
   const CardContainer({super.key, required this.child});
 
   @override
@@ -244,12 +285,7 @@ class CardContainer extends StatelessWidget {
 class RoundedIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
-
-  const RoundedIconButton({
-    super.key,
-    required this.icon,
-    this.onTap,
-  });
+  const RoundedIconButton({super.key, required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -275,12 +311,7 @@ class RoundedIconButton extends StatelessWidget {
 class PrimaryButton extends StatelessWidget {
   final String text;
   final VoidCallback onTap;
-
-  const PrimaryButton({
-    super.key,
-    required this.text,
-    required this.onTap,
-  });
+  const PrimaryButton({super.key, required this.text, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -301,50 +332,6 @@ class PrimaryButton extends StatelessWidget {
               text,
               style: const TextStyle(
                 color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class SecondaryButton extends StatelessWidget {
-  final String text;
-  final VoidCallback onTap;
-
-  const SecondaryButton({
-    super.key,
-    required this.text,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: const Color(0xFFCBFBC7),
-          width: 1.5,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(28),
-          onTap: onTap,
-          child: Center(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Color(0xFFCBFBC7),
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),

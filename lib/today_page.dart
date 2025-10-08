@@ -9,6 +9,7 @@ import 'test_question.dart';
 import 'app_drawer.dart';
 import 'challenge_full.dart';
 import 'team_list.dart';
+import 'favorite_button.dart';
 
 class TodayPage extends StatefulWidget {
   const TodayPage({super.key});
@@ -312,110 +313,122 @@ class _TodayPageState extends State<TodayPage> {
     );
   }
 
-  Widget _buildDailyReflection() {
-    final title = (_reflection?['title'] as String?)?.trim() ?? 'Untitled';
-    final transcript = (_reflection?['transcript'] as String?)?.trim();
-    final audioUrl = (_reflection?['audio_url'] as String?)?.trim();
+ Widget _buildDailyReflection() {
+  final title = (_reflection?['title'] as String?)?.trim() ?? 'Untitled';
+  final transcript = (_reflection?['transcript'] as String?)?.trim();
+  final audioUrl = (_reflection?['audio_url'] as String?)?.trim();
+  final reflectionId = _reflection?['id']?.toString() ?? ''; // 👈 importante para el botón
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Jamie's Daily Reflection",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+  return Stack(
+    children: [
+      Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Jamie's Daily Reflection",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF404040),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    _isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.white,
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF404040),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  onPressed: () async {
-                    if (audioUrl == null || audioUrl.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('No audio available.'),
-                        ),
-                      );
-                      return;
-                    }
-
-                    try {
-                      if (_isPlaying) {
-                        await _audioPlayer.pause();
-                        setState(() => _isPlaying = false);
-                      } else {
-                        await _audioPlayer.stop();
-                        await _audioPlayer.play(UrlSource(audioUrl));
-                        setState(() => _isPlaying = true);
-
-                        _audioPlayer.onPlayerComplete.listen((_) {
-                          setState(() => _isPlaying = false);
-                        });
+                  child: IconButton(
+                    icon: Icon(
+                      _isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                    ),
+                    onPressed: () async {
+                      if (audioUrl == null || audioUrl.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No audio available.')),
+                        );
+                        return;
                       }
-                    } catch (e) {
-                      debugPrint("❌ Error playing audio: $e");
-                    }
-                  },
+
+                      try {
+                        if (_isPlaying) {
+                          await _audioPlayer.pause();
+                          setState(() => _isPlaying = false);
+                        } else {
+                          await _audioPlayer.stop();
+                          await _audioPlayer.play(UrlSource(audioUrl));
+                          setState(() => _isPlaying = true);
+                          _audioPlayer.onPlayerComplete.listen((_) {
+                            setState(() => _isPlaying = false);
+                          });
+                        }
+                      } catch (e) {
+                        debugPrint("❌ Error playing audio: $e");
+                      }
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const Text(
-                      "Listen to today's wisdom",
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                    ),
-                  ],
+                      const Text(
+                        "Listen to today's wisdom",
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            (transcript == null || transcript.isEmpty)
-                ? 'No transcript available for this reflection.'
-                : transcript,
-            style: TextStyle(
-              color: Colors.grey[300],
-              fontSize: 14,
-              height: 1.5,
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              (transcript == null || transcript.isEmpty)
+                  ? 'No transcript available for this reflection.'
+                  : transcript,
+              style: TextStyle(
+                color: Colors.grey[300],
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-  }
+
+      // ❤️ Botón en la esquina superior derecha
+      Positioned(
+        right: 30,
+        top: 25,
+        child: FavoriteButton(
+          contentType: 'reflection',
+          contentId: reflectionId,
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildDailyChallenge() {
     final challengeTitle = (_challenge?['title'] as String?)?.trim();
@@ -469,7 +482,7 @@ class _TodayPageState extends State<TodayPage> {
                 ],
               ),
               const Text(
-                '🔥7',
+                '',
                 style: TextStyle(
                   color: Colors.black87,
                   fontSize: 16,

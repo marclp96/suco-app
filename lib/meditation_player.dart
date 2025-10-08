@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'after_meditation_popup.dart'; // 👈 Import del popup post-meditación
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'after_meditation_popup.dart';
+import 'favorite_button.dart';
 
 class MeditationPlayerPage extends StatefulWidget {
   final String audioUrl;
-  final String duration; // "15 minutes", "20 minutes", "30 minutes"
+  final String duration;
+  final String? meditationId;
 
   const MeditationPlayerPage({
     super.key,
     required this.audioUrl,
     required this.duration,
+    this.meditationId,
   });
 
   @override
@@ -21,14 +25,14 @@ class _MeditationPlayerPageState extends State<MeditationPlayerPage> {
   bool _isPlaying = false;
   Duration _position = Duration.zero;
   Duration _totalDuration = Duration.zero;
-  late Duration _sessionDuration; // límite elegido
+  late Duration _sessionDuration;
+  final supabase = Supabase.instance.client;
 
   @override
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
 
-    // Definir la duración de la sesión en minutos según el popup
     final minutes = int.tryParse(widget.duration.split(" ")[0]) ?? 20;
     _sessionDuration = Duration(minutes: minutes);
 
@@ -44,11 +48,7 @@ class _MeditationPlayerPageState extends State<MeditationPlayerPage> {
 
     _audioPlayer.onPositionChanged.listen((p) {
       setState(() => _position = p);
-
-      // cortar al llegar al límite de sesión
-      if (p >= _sessionDuration) {
-        _stopSession();
-      }
+      if (p >= _sessionDuration) _stopSession();
     });
 
     _audioPlayer.onPlayerComplete.listen((_) => _stopSession());
@@ -73,12 +73,33 @@ class _MeditationPlayerPageState extends State<MeditationPlayerPage> {
       _position = Duration.zero;
     });
 
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        debugPrint("⚠️ No user logged in, skipping session log.");
+        return;
+      }
+
+      await supabase.from('journey_session_log').insert({
+        'user_id': user.id,
+        'meditation_id': widget.meditationId,
+        'duration': _sessionDuration.inMinutes,
+        'date': DateTime.now().toIso8601String(),
+        'completed': true,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      debugPrint("✅ Meditation session saved in journey_session_log");
+    } catch (e) {
+      debugPrint("❌ Error saving session: $e");
+    }
+
     if (mounted) {
-      // 👇 Mostrar el AfterMeditationPopup en lugar del AlertDialog
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => AfterMeditationPopup(), // 🔹 sin const
+        builder: (_) =>
+            AfterMeditationPopup(duration: _sessionDuration.inMinutes),
       );
     }
   }
@@ -125,7 +146,7 @@ class _MeditationPlayerPageState extends State<MeditationPlayerPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Imagen tipo portada
+            // 🔹 Portada
             Container(
               width: 250,
               height: 250,
@@ -138,31 +159,54 @@ class _MeditationPlayerPageState extends State<MeditationPlayerPage> {
                 ),
               ),
             ),
+
             const SizedBox(height: 30),
 
-            // Barra de progreso
-            Slider(
-              activeColor: const Color(0xFFCBFBC7),
-              inactiveColor: Colors.white24,
-              value: _position.inSeconds.toDouble(),
-              max: _sessionDuration.inSeconds.toDouble(),
-              onChanged: (value) async {
-                final pos = Duration(seconds: value.toInt());
-                await _audioPlayer.seek(pos);
-              },
+            // 🔹 Barra de progreso con el corazón al lado derecho
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Slider(
+                    activeColor: const Color(0xFFCBFBC7),
+                    inactiveColor: Colors.white24,
+                    value: _position.inSeconds
+                        .clamp(0, _sessionDuration.inSeconds)
+                        .toDouble(),
+                    max: _sessionDuration.inSeconds.toDouble(),
+                    onChanged: (value) async {
+                      final pos = Duration(seconds: value.toInt());
+                      await _audioPlayer.seek(pos);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // ❤️ Siempre visible — seguro ante IDs vacíos
+                FavoriteButton(
+                  contentType: 'meditation',
+                  contentId: widget.meditationId ?? 'unknown',
+                ),
+              ],
             ),
+
+            // 🔹 Tiempo actual y duración total
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(_formatTime(_position),
-                    style: const TextStyle(color: Colors.white70)),
-                Text(_formatTime(_sessionDuration),
-                    style: const TextStyle(color: Colors.white70)),
+                Text(
+                  _formatTime(_position),
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                Text(
+                  _formatTime(_sessionDuration),
+                  style: const TextStyle(color: Colors.white70),
+                ),
               ],
             ),
+
             const SizedBox(height: 30),
 
-            // Botón play/pause
+            // 🔹 Botón play/pause
             IconButton(
               iconSize: 64,
               icon: Icon(

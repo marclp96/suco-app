@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import 'app_drawer.dart'; // 👈 Import del Drawer
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_drawer.dart';
+import 'today_page.dart';
+import 'meditation_player.dart';
+import 'test_question.dart';
 
 class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});
@@ -9,261 +13,241 @@ class FavoritesPage extends StatefulWidget {
 }
 
 class _FavoritesPageState extends State<FavoritesPage> {
-  String _selectedFilter = "All";
+  final supabase = Supabase.instance.client;
+  String selectedFilter = "All";
+  List<Map<String, dynamic>> favorites = [];
+  bool loading = true;
 
-  final List<Map<String, dynamic>> _favorites = [
-    {
-      "title": "Finding Peace in Uncertainty",
-      "type": "Daily Reflection",
-      "description":
-          "Embrace the unknown as an opportunity for growth. When we learn to find comfort in",
-      "date": "Jan 15, 2025",
-      "duration": null,
-    },
-    {
-      "title": "Morning Mindfulness",
-      "type": "Meditation",
-      "description":
-          "Start your day with intention and clarity through this guided breathing meditation designed for",
-      "date": "Jan 14, 2025",
-      "duration": "10 min",
-    },
-    {
-      "title": "The Science of Gratitude",
-      "type": "Fact",
-      "description":
-          "Research shows that practicing gratitude for just minutes daily can increase happiness levels by",
-      "date": "Jan 13, 2025",
-      "duration": null,
-    },
-    {
-      "title": "Body Scan Relaxation",
-      "type": "Meditation",
-      "description":
-          "Release tension and stress with this progressive body scan meditation that guides you through",
-      "date": "Jan 12, 2025",
-      "duration": "15 min",
-    },
-    {
-      "title": "Lessons from Nature",
-      "type": "Daily Reflection",
-      "description":
-          "Trees teach us patience and resilience. They bend without breaking, grow slowly but surely,",
-      "date": "Jan 11, 2025",
-      "duration": null,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchFavorites();
+  }
+
+  Future<void> _fetchFavorites() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final favs = await supabase
+          .from('favorites')
+          .select('id, content_type, content_id')
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
+
+      List<Map<String, dynamic>> results = [];
+
+      for (final fav in favs) {
+        final type = fav['content_type'];
+        final id = fav['content_id'];
+        Map<String, dynamic>? content;
+
+        if (type == 'reflection') {
+          content = await supabase
+              .from('reflections')
+              .select('id, title, transcript')
+              .eq('id', id)
+              .maybeSingle();
+        } else if (type == 'meditation') {
+          content = await supabase
+              .from('meditations')
+              .select('id, title, description')
+              .eq('id', id)
+              .maybeSingle();
+        } else if (type == 'test') {
+          content = await supabase
+              .from('tests')
+              .select('id, title, description')
+              .eq('id', id)
+              .maybeSingle();
+        }
+
+        if (content != null) {
+          results.add({
+            'type': type,
+            'title': content['title'] ?? 'Untitled',
+            'description': content['description'] ??
+                content['transcript'] ??
+                '',
+            'id': content['id'],
+          });
+        }
+      }
+
+      setState(() {
+        favorites = results;
+        loading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Error loading favorites: $e');
+      setState(() => loading = false);
+    }
+  }
+
+  List<Map<String, dynamic>> get filteredFavorites {
+    if (selectedFilter == "All") return favorites;
+    return favorites
+        .where((f) => f['type'].toString().toLowerCase() ==
+            selectedFilter.toLowerCase())
+        .toList();
+  }
+
+  void _openFavorite(Map<String, dynamic> fav) {
+    if (fav['type'] == 'reflection') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TodayPage()),
+      );
+    } else if (fav['type'] == 'meditation') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MeditationPlayerPage(
+            audioUrl: '', // ⚠️ deberías obtener el audio real de Supabase
+            duration: '20 min',
+            meditationId: fav['id'],
+          ),
+        ),
+      );
+    } else if (fav['type'] == 'test') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TestQuestionPage(testId: fav['id']),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _selectedFilter == "All"
-        ? _favorites
-        : _favorites
-            .where((item) =>
-                item["type"].toString().contains(_selectedFilter))
-            .toList();
+    final filters = ["All", "Reflection", "Meditation", "Test"];
 
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
-      drawer: const AppDrawer(), // 👈 Drawer conectado
+      drawer: const AppDrawer(),
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
-            _buildFilters(),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final fav = filtered[index];
-                  return _buildFavoriteCard(fav);
-                },
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF333333),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.arrow_back,
+                          color: Colors.white, size: 20),
+                    ),
+                  ),
+                  const Text(
+                    "My Favorites",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Builder(
+                    builder: (context) => GestureDetector(
+                      onTap: () => Scaffold.of(context).openDrawer(),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF333333),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.menu,
+                            color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+
+            // Filtros
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: filters.map((filter) {
+                  final isSelected = selectedFilter == filter;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(filter),
+                      selected: isSelected,
+                      onSelected: (_) =>
+                          setState(() => selectedFilter = filter),
+                      selectedColor: const Color(0xFFCBFBC7),
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? Colors.black
+                            : Colors.white70,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      backgroundColor: const Color(0xFF2A2A2A),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            Expanded(
+              child: loading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFFCBFBC7),
+                      ),
+                    )
+                  : filteredFavorites.isEmpty
+                      ? const Center(
+                          child: Text(
+                            "No favorites yet 💔",
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: filteredFavorites.length,
+                          itemBuilder: (context, index) {
+                            final fav = filteredFavorites[index];
+                            return ListTile(
+                              title: Text(
+                                fav['title'],
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(
+                                fav['description'] ?? '',
+                                style: const TextStyle(
+                                    color: Colors.white70),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: const Icon(
+                                Icons.favorite,
+                                color: Colors.redAccent,
+                              ),
+                              onTap: () => _openFavorite(fav),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Back button
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF333333),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.arrow_back,
-                  color: Colors.white, size: 20),
-            ),
-          ),
-          const Text(
-            "My Favorites",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          // 👇 Botón hamburguesa que abre el Drawer
-          Builder(
-            builder: (context) => GestureDetector(
-              onTap: () => Scaffold.of(context).openDrawer(),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF333333),
-                  shape: BoxShape.circle,
-                ),
-                child:
-                    const Icon(Icons.menu, color: Colors.white, size: 20),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilters() {
-    final filters = ["All", "Reflections", "Challenges", "Meditations"];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: filters.map((f) {
-          final selected = _selectedFilter == f;
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedFilter = f;
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.only(right: 12),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: selected
-                    ? const Color(0xFFCBFBC7)
-                    : const Color(0xFF2A2A2A),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Text(
-                f,
-                style: TextStyle(
-                  color: selected ? Colors.black : Colors.white,
-                  fontSize: 14,
-                  fontWeight:
-                      selected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildFavoriteCard(Map<String, dynamic> fav) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title & type
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.favorite_border,
-                  color: Colors.white, size: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      fav["title"],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      fav["type"],
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            fav["description"],
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today,
-                      color: Colors.white54, size: 16),
-                  const SizedBox(width: 6),
-                  Text(
-                    fav["date"],
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 12),
-                  ),
-                  if (fav["duration"] != null) ...[
-                    const SizedBox(width: 12),
-                    const Icon(Icons.access_time,
-                        color: Colors.white54, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      fav["duration"],
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12),
-                    ),
-                  ],
-                ],
-              ),
-              Icon(
-                fav["type"] == "Meditation"
-                    ? Icons.play_circle_fill
-                    : Icons.bookmark_border,
-                color: Colors.white70,
-                size: 22,
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

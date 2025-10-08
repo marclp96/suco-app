@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_drawer.dart';
 import 'duration_popup.dart';
 import 'widgets/vimeo_player_widget.dart';
-import 'test_question.dart'; // 👈 Import del test
+import 'test_question.dart';
 
 class BeHereNowPage extends StatefulWidget {
   const BeHereNowPage({super.key});
@@ -16,7 +16,11 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
   String? _videoId;
   String? _beHereNowAudioUrl;
   String? _deepSleepAudioUrl;
+  String? _beHereNowId;
+  String? _deepSleepId;
   bool _loadingVideo = true;
+
+  VimeoPlayerWidgetState? _vimeoPlayer; // 👈 Guardamos el estado del reproductor
 
   @override
   void initState() {
@@ -26,7 +30,6 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     _fetchDeepSleepAudio();
   }
 
-  // 🔹 Intro video
   Future<void> _fetchVideoFromSupabase() async {
     try {
       final supabase = Supabase.instance.client;
@@ -61,14 +64,12 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     }
   }
 
-  // 🔹 Audio Be Here Now
   Future<void> _fetchBeHereNowAudio() async {
     try {
       final supabase = Supabase.instance.client;
-
       final res = await supabase
           .from('meditations')
-          .select('media_content')
+          .select('id, media_content')
           .eq('title', 'Be Here Now')
           .single();
 
@@ -80,7 +81,10 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
             .inFilter('media_id', mediaIds);
 
         if (versions.isNotEmpty) {
-          setState(() => _beHereNowAudioUrl = versions[0]['url'] as String);
+          setState(() {
+            _beHereNowAudioUrl = versions[0]['url'] as String;
+            _beHereNowId = res['id'] as String;
+          });
         }
       }
     } catch (e) {
@@ -88,14 +92,12 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     }
   }
 
-  // 🔹 Audio Deep Sleep
   Future<void> _fetchDeepSleepAudio() async {
     try {
       final supabase = Supabase.instance.client;
-
       final res = await supabase
           .from('meditations')
-          .select('media_content')
+          .select('id, media_content')
           .eq('title', 'Deep Sleep')
           .single();
 
@@ -107,7 +109,10 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
             .inFilter('media_id', mediaIds);
 
         if (versions.isNotEmpty) {
-          setState(() => _deepSleepAudioUrl = versions[0]['url'] as String);
+          setState(() {
+            _deepSleepAudioUrl = versions[0]['url'] as String;
+            _deepSleepId = res['id'] as String;
+          });
         }
       }
     } catch (e) {
@@ -115,7 +120,6 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     }
   }
 
-  // 🔹 Header
   Widget _buildHeader(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -161,7 +165,6 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     );
   }
 
-  // 🔹 Hero Video Section (Vimeo)
   Widget _buildHeroVideo() {
     if (_loadingVideo) {
       return const Center(
@@ -184,7 +187,9 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
       );
     }
 
-    // ✅ VimeoPlayerWidget actualizado (funciona en iOS / Android / Web)
+    final player = VimeoPlayerWidget(videoId: _videoId!, autoPlay: true, loop: false);
+    _vimeoPlayer = player.createState(); // 👈 Guardamos el estado del player
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       height: 220,
@@ -193,15 +198,10 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
         color: Colors.black,
       ),
       clipBehavior: Clip.hardEdge,
-      child: VimeoPlayerWidget(
-        videoId: _videoId!,
-        autoPlay: true,
-        loop: false, // Puedes poner true si quieres que repita
-      ),
+      child: player,
     );
   }
 
-  // 🔹 Intro Text
   Widget _buildIntroText() {
     return const Padding(
       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -230,7 +230,6 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     );
   }
 
-  // 🔹 Video Sections
   Widget _buildVideoSection({
     required String title,
     required List<Map<String, String>> cards,
@@ -256,19 +255,26 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: () {
+                    // 👇 Pausa el vídeo antes de abrir una meditación
+                    _vimeoPlayer?.pauseVideo();
+
                     if (card["title"] == "Be Here Now" &&
                         _beHereNowAudioUrl != null) {
                       showDialog(
                         context: context,
-                        builder: (_) =>
-                            DurationPopup(audioUrl: _beHereNowAudioUrl!),
+                        builder: (_) => DurationPopup(
+                          audioUrl: _beHereNowAudioUrl!,
+                          meditationId: _beHereNowId,
+                        ),
                       );
                     } else if (card["title"] == "Deep Sleep" &&
                         _deepSleepAudioUrl != null) {
                       showDialog(
                         context: context,
-                        builder: (_) =>
-                            DurationPopup(audioUrl: _deepSleepAudioUrl!),
+                        builder: (_) => DurationPopup(
+                          audioUrl: _deepSleepAudioUrl!,
+                          meditationId: _deepSleepId,
+                        ),
                       );
                     } else if (card["title"] == "Mindfulness Test") {
                       Navigator.push(

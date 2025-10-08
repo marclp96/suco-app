@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'duration_popup.dart'; // 👈 Importa el popup de duración
 
 class AfterMeditationPopup extends StatefulWidget {
-  final int duration; // minutos de la sesión
+  final String? followUpMeditationId; // 👈 se recibe del test
+  final int duration; // minutos de la sesión previa
 
-  const AfterMeditationPopup({super.key, this.duration = 15});
+  const AfterMeditationPopup({
+    super.key,
+    this.followUpMeditationId,
+    this.duration = 15,
+  });
 
   @override
   State<AfterMeditationPopup> createState() => _AfterMeditationPopupState();
@@ -26,13 +32,14 @@ class _AfterMeditationPopupState extends State<AfterMeditationPopup> {
         return;
       }
 
-      // 🔹 Mapa de estado de ánimo
+      // Mapa de estado de ánimo
       final moods = ["Struggling", "Content", "Ecstatic"];
       final selectedMood = moods[_moodValue.toInt()];
 
-      // 🔹 Guardar sesión en journey_session_log
+      // 🔹 Guardar sesión en journey_session_log (incluye meditation_id si hay)
       await supabase.from('journey_session_log').insert({
         'user_id': user.id,
+        'meditation_id': widget.followUpMeditationId,
         'duration': widget.duration,
         'date': DateTime.now().toIso8601String(),
         'completed': true,
@@ -48,7 +55,14 @@ class _AfterMeditationPopupState extends State<AfterMeditationPopup> {
       });
 
       debugPrint("✅ Meditation session and reflection saved successfully.");
-      Navigator.pop(context);
+
+      // 👇 Después de guardar, ir a la meditación de seguimiento si existe
+      if (widget.followUpMeditationId != null) {
+        await _goToFollowUpMeditation();
+      } else {
+        Navigator.pop(context);
+      }
+
     } catch (e) {
       debugPrint("❌ Error saving meditation/reflection: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -59,6 +73,80 @@ class _AfterMeditationPopupState extends State<AfterMeditationPopup> {
       );
     } finally {
       setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _goToFollowUpMeditation() async {
+    try {
+      final meditationId = widget.followUpMeditationId!;
+      debugPrint("➡️ Loading follow-up meditation: $meditationId");
+
+      // 🔹 Obtener la meditación desde Supabase
+      final meditation = await supabase
+          .from('meditations')
+          .select('media_content, title')
+          .eq('id', meditationId)
+          .maybeSingle();
+
+      if (meditation == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Meditation not found."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
+      // 🔹 Buscar la URL de audio desde media_versions
+      final mediaList = meditation['media_content'] as List?;
+      if (mediaList == null || mediaList.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("This meditation has no audio assigned."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
+      final audioId = mediaList.first;
+      final audioData = await supabase
+          .from('media_versions')
+          .select('url')
+          .eq('media_id', audioId)
+          .maybeSingle();
+
+      final audioUrl = audioData?['url'];
+      if (audioUrl == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Audio not found for this meditation."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
+      // 🔹 Abrir el popup de duración (como en BeHereNow)
+      if (!mounted) return;
+      Navigator.pop(context); // Cerrar este popup primero
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => DurationPopup(
+          meditationId: meditationId,
+          audioUrl: audioUrl,
+        ),
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error loading follow-up meditation: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error loading meditation: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
@@ -77,8 +165,7 @@ class _AfterMeditationPopupState extends State<AfterMeditationPopup> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.favorite,
-                  size: 48, color: Color(0xFFCBFBC7)),
+              const Icon(Icons.favorite, size: 48, color: Color(0xFFCBFBC7)),
               const SizedBox(height: 16),
               const Text("Meditation Complete",
                   style: TextStyle(
