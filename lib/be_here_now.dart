@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vimeo_video_player/vimeo_video_player.dart'; // 🟢 SDK oficial Vimeo
+import 'package:vimeo_video_player/vimeo_video_player.dart'; // ✅ SDK oficial actualizado
 import 'app_drawer.dart';
 import 'duration_popup.dart';
 import 'test_question.dart';
@@ -14,6 +14,7 @@ class BeHereNowPage extends StatefulWidget {
 
 class _BeHereNowPageState extends State<BeHereNowPage> {
   String? _videoUrl;
+  String? _videoId; // ✅ añadido para vimeo_video_player 1.0.1
   String? _beHereNowAudioUrl;
   String? _deepSleepAudioUrl;
   String? _beHereNowId;
@@ -44,17 +45,17 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
           introVideo['media_versions'] != null &&
           introVideo['media_versions'].isNotEmpty) {
         final url = introVideo['media_versions'][0]['url'] as String;
-        final regex = RegExp(r'vimeo\.com/(\d+)');
+
+        // 🧩 Extraer ID de Vimeo
+        final regex = RegExp(r'vimeo\.com/(?:video/)?(\d+)');
         final match = regex.firstMatch(url);
-        if (match != null) {
-          final videoId = match.group(1)!;
-          setState(() {
-            _videoUrl = 'https://player.vimeo.com/video/$videoId';
-            _loadingVideo = false;
-          });
-        } else {
-          setState(() => _loadingVideo = false);
-        }
+        final videoId = match != null ? match.group(1)! : null;
+
+        setState(() {
+          _videoUrl = url;
+          _videoId = videoId; // ✅ guardar ID para el reproductor
+          _loadingVideo = false;
+        });
       } else {
         setState(() => _loadingVideo = false);
       }
@@ -175,7 +176,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
       );
     }
 
-    if (_videoUrl == null) {
+    if (_videoId == null) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(20),
@@ -196,8 +197,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
       ),
       clipBehavior: Clip.hardEdge,
       child: VimeoVideoPlayer(
-        url: _videoUrl!,
-        autoPlay: true,
+        videoId: _videoId!, // ✅ versión actual del paquete
       ),
     );
   }
@@ -218,7 +218,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
           ),
           SizedBox(height: 8),
           Text(
-            "Introduction to becoming one with the here and now, to start your SUCO journey",
+            "Introduction to becoming one with the here and now, to start your SUCO journey.",
             style: TextStyle(
               color: Colors.white70,
               fontSize: 14,

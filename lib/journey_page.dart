@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vimeo_video_player/vimeo_video_player.dart'; // 🟢 SDK Vimeo
+import 'package:vimeo_video_player/vimeo_video_player.dart'; // ✅ Versión 1.0.1
 import 'nav.dart';
 import 'today_page.dart';
 import 'live_home.dart';
@@ -21,6 +21,7 @@ class JourneyPage extends StatefulWidget {
 class _JourneyPageState extends State<JourneyPage> {
   int _selectedIndex = 2;
   String? _videoUrl;
+  String? _videoId; // ✅ Añadido para extraer el ID de Vimeo
   bool _loadingVideo = true;
 
   List<String> _completedItems = [];
@@ -43,23 +44,22 @@ class _JourneyPageState extends State<JourneyPage> {
 
       if (response != null && response['intro_video_url'] != null) {
         final url = response['intro_video_url'] as String;
-        final regex = RegExp(r'vimeo\.com/(\d+)');
-        final match = regex.firstMatch(url);
 
-        if (match != null) {
-          final videoId = match.group(1)!;
-          setState(() {
-            _videoUrl = 'https://player.vimeo.com/video/$videoId';
-            _loadingVideo = false;
-          });
-        } else {
-          setState(() => _loadingVideo = false);
-        }
+        // 🧩 Extraer ID de Vimeo desde la URL
+        final regExp = RegExp(r'vimeo\.com/(?:video/)?(\d+)');
+        final match = regExp.firstMatch(url);
+        final id = match != null ? match.group(1)! : null;
+
+        setState(() {
+          _videoUrl = url;
+          _videoId = id;
+          _loadingVideo = false;
+        });
       } else {
         setState(() => _loadingVideo = false);
       }
     } catch (e) {
-      debugPrint("❌ Error loading intro video: $e");
+      debugPrint("❌ Error cargando el vídeo: $e");
       setState(() => _loadingVideo = false);
     }
   }
@@ -161,7 +161,7 @@ class _JourneyPageState extends State<JourneyPage> {
 
   /// 🎥 Mostrar intro video (diálogo modal)
   void _showIntroVideo(BuildContext context) {
-    if (_videoUrl == null) {
+    if (_videoId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No intro video found')),
       );
@@ -186,8 +186,7 @@ class _JourneyPageState extends State<JourneyPage> {
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: VimeoVideoPlayer(
-                    url: _videoUrl!,
-                    autoPlay: true,
+                    videoId: _videoId!, // ✅ Correcto para vimeo_video_player: ^1.0.1
                   ),
                 ),
               ),
@@ -263,39 +262,6 @@ class _JourneyPageState extends State<JourneyPage> {
                         "subtitle": "Learn to empathize",
                         "locked": true,
                         "type": "meditation"
-                      },
-                    ],
-                  ),
-                  _buildSeriesSection(
-                    title: "Create Series",
-                    description:
-                        "Learn to let go, to destress, to awaken your emotional intelligence, finding your personal state of Flow.",
-                    lessons: [
-                      {
-                        "title": "Let Go",
-                        "subtitle": "Learn to let go",
-                        "locked": true,
-                        "type": "meditation"
-                      },
-                      {"title": "Feel", "subtitle": "Learn to feel", "locked": true},
-                      {"title": "Play", "subtitle": "Learn to play", "locked": true},
-                    ],
-                  ),
-                  _buildSeriesSection(
-                    title: "Celebrate Series",
-                    description:
-                        "Cultivate deep gratitude, body appreciation, and unity consciousness. Through celebration practices, we release endorphins and feel joy.",
-                    lessons: [
-                      {
-                        "title": "The Miracle of You",
-                        "subtitle": "Learn about yourself",
-                        "locked": true
-                      },
-                      {"title": "Unity", "subtitle": "Learn to unify", "locked": true},
-                      {
-                        "title": "Gratitude for the Now",
-                        "subtitle": "Learn to be grateful",
-                        "locked": true
                       },
                     ],
                   ),
@@ -375,7 +341,7 @@ class _JourneyPageState extends State<JourneyPage> {
     return const Padding(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
       child: Text(
-        "The 9 Meditations Journey\n\nToday, let’s explore the profound connection between sound and consciousness. When we align our internal frequency with the vibrations of the universe, we become conduits for transformation.",
+        "The 9 Meditations Journey\n\nToday, let’s explore the profound connection between sound and consciousness.",
         style: TextStyle(
           color: Colors.white,
           fontSize: 14,
@@ -413,6 +379,7 @@ class _JourneyPageState extends State<JourneyPage> {
     );
   }
 
+  /// 🔹 SECCIÓN DE SERIES (Connect, Create, Celebrate)
   Widget _buildSeriesSection({
     required String title,
     required String description,
@@ -428,21 +395,29 @@ class _JourneyPageState extends State<JourneyPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 12),
-          Text(description,
-              style: const TextStyle(
-                  color: Colors.white70, fontSize: 14, height: 1.4)),
+          Text(
+            description,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
           const SizedBox(height: 16),
           Column(
             children: lessons.map((lesson) {
               final locked = lesson['locked'] as bool;
-              final title = lesson['title'];
-              final completed = _completedItems.contains(title);
+              final lessonTitle = lesson['title'];
+              final completed = _completedItems.contains(lessonTitle);
               final type = lesson['type'] ?? 'meditation';
 
               return Container(
@@ -462,21 +437,27 @@ class _JourneyPageState extends State<JourneyPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(title,
-                              style: TextStyle(
-                                  color: completed
-                                      ? const Color(0xFFCBFBC7)
-                                      : locked
-                                          ? Colors.white54
-                                          : Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600)),
+                          Text(
+                            lessonTitle,
+                            style: TextStyle(
+                              color: completed
+                                  ? const Color(0xFFCBFBC7)
+                                  : locked
+                                      ? Colors.white54
+                                      : Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          Text(lesson['subtitle'],
-                              style: TextStyle(
-                                  color:
-                                      locked ? Colors.white38 : Colors.white70,
-                                  fontSize: 12)),
+                          Text(
+                            lesson['subtitle'],
+                            style: TextStyle(
+                              color:
+                                  locked ? Colors.white38 : Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -484,9 +465,9 @@ class _JourneyPageState extends State<JourneyPage> {
                       onTap: () async {
                         if (locked) return;
                         if (type == 'test') {
-                          await _openTest(context, title);
+                          await _openTest(context, lessonTitle);
                         } else {
-                          await _openMeditation(context, title);
+                          await _openMeditation(context, lessonTitle);
                         }
                       },
                       child: Container(
