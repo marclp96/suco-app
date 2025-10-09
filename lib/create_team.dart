@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 class CreateTeamPage extends StatefulWidget {
@@ -91,30 +90,6 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
         const SnackBar(content: Text("Invite link copied to clipboard")),
       );
     }
-  }
-
-  void _showQrCode() {
-    if (_inviteLink == null) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text("Team QR Code", style: TextStyle(color: Colors.white)),
-        content: QrImageView(
-          data: _inviteLink!,
-          version: QrVersions.auto,
-          size: 200,
-          foregroundColor: Colors.white,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close", style: TextStyle(color: Colors.white70)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -248,28 +223,17 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _copyLink,
-                      icon: const Icon(Icons.share, color: Colors.black),
-                      label: const Text("Share"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFCBFBC7),
-                        foregroundColor: Colors.black,
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _copyLink,
+                    icon: const Icon(Icons.share, color: Colors.black),
+                    label: const Text("Share"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFCBFBC7),
+                      foregroundColor: Colors.black,
                     ),
-                    ElevatedButton.icon(
-                      onPressed: _showQrCode,
-                      icon: const Icon(Icons.qr_code, color: Colors.black),
-                      label: const Text("QR Code"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFCBFBC7),
-                        foregroundColor: Colors.black,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ]
             ],
