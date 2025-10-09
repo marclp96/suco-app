@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 class CreateTeamPage extends StatefulWidget {
   const CreateTeamPage({super.key});
@@ -39,7 +40,7 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
     });
 
     try {
-      // 1️⃣ Crear el team
+      // 1️⃣ Crear el equipo
       final response = await supabase.from('teams').insert({
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
@@ -57,13 +58,26 @@ class _CreateTeamPageState extends State<CreateTeamPage> {
         'role': 'owner',
       });
 
-      // 3️⃣ Generar invite link seguro (fix aplicado)
-      final inviteLink = "https://sucosessions.com/join/$teamId";
+      // 3️⃣ Crear token único e invitación en team_invites
+      final token = const Uuid().v4();
+      await supabase.from('team_invites').insert({
+        'email': user.email,
+        'team_id': teamId,
+        'role': 'owner',
+        'token': token,
+        'sender_id': user.id,
+        'status': 'accepted',
+        'accepted_at': DateTime.now().toIso8601String(),
+      });
+
+      // 4️⃣ Generar link público con token
+      final inviteLink = "https://sucosessions.com/join/$token";
 
       setState(() {
         _inviteLink = inviteLink;
       });
     } catch (e) {
+      debugPrint("❌ Error creating team: $e");
       setState(() => _error = "Error creating team: $e");
     } finally {
       setState(() => _loading = false);

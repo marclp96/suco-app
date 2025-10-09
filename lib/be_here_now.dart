@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vimeo_video_player/vimeo_video_player.dart'; // 🟢 SDK oficial Vimeo
 import 'app_drawer.dart';
 import 'duration_popup.dart';
-import 'widgets/vimeo_player_widget.dart';
 import 'test_question.dart';
 
 class BeHereNowPage extends StatefulWidget {
@@ -13,14 +13,12 @@ class BeHereNowPage extends StatefulWidget {
 }
 
 class _BeHereNowPageState extends State<BeHereNowPage> {
-  String? _videoId;
+  String? _videoUrl;
   String? _beHereNowAudioUrl;
   String? _deepSleepAudioUrl;
   String? _beHereNowId;
   String? _deepSleepId;
   bool _loadingVideo = true;
-
-  //VimeoPlayerWidgetState? _vimeoPlayer; // 👈 Guardamos el estado del reproductor
 
   @override
   void initState() {
@@ -30,6 +28,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
     _fetchDeepSleepAudio();
   }
 
+  /// 🎬 Carga del vídeo desde Supabase
   Future<void> _fetchVideoFromSupabase() async {
     try {
       final supabase = Supabase.instance.client;
@@ -48,8 +47,9 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
         final regex = RegExp(r'vimeo\.com/(\d+)');
         final match = regex.firstMatch(url);
         if (match != null) {
+          final videoId = match.group(1)!;
           setState(() {
-            _videoId = match.group(1);
+            _videoUrl = 'https://player.vimeo.com/video/$videoId';
             _loadingVideo = false;
           });
         } else {
@@ -175,7 +175,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
       );
     }
 
-    if (_videoId == null) {
+    if (_videoUrl == null) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(20),
@@ -187,9 +187,6 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
       );
     }
 
-    final player = VimeoPlayerWidget(videoId: _videoId!, autoPlay: true);
-    //_vimeoPlayer = player.createState(); // 👈 Guardamos el estado del player
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       height: 220,
@@ -198,7 +195,10 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
         color: Colors.black,
       ),
       clipBehavior: Clip.hardEdge,
-      child: player,
+      child: VimeoVideoPlayer(
+        url: _videoUrl!,
+        autoPlay: true,
+      ),
     );
   }
 
@@ -255,9 +255,6 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: () {
-                    // 👇 Pausa el vídeo antes de abrir una meditación
-                    //_vimeoPlayer?.pauseVideo();
-
                     if (card["title"] == "Be Here Now" &&
                         _beHereNowAudioUrl != null) {
                       showDialog(

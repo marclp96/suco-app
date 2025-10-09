@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vimeo_video_player/vimeo_video_player.dart'; // 🟢 SDK Vimeo
 import 'nav.dart';
 import 'today_page.dart';
 import 'live_home.dart';
@@ -8,8 +9,7 @@ import 'profile.dart';
 import 'be_here_now.dart';
 import 'app_drawer.dart';
 import 'team_list.dart';
-import 'widgets/vimeo_player_widget.dart';
-import 'test_question.dart'; // ✅ para lanzar los tests
+import 'test_question.dart';
 
 class JourneyPage extends StatefulWidget {
   const JourneyPage({super.key});
@@ -20,7 +20,7 @@ class JourneyPage extends StatefulWidget {
 
 class _JourneyPageState extends State<JourneyPage> {
   int _selectedIndex = 2;
-  String? _videoId;
+  String? _videoUrl;
   bool _loadingVideo = true;
 
   List<String> _completedItems = [];
@@ -33,6 +33,7 @@ class _JourneyPageState extends State<JourneyPage> {
     _loadUserProgress();
   }
 
+  /// 🎬 Cargar vídeo de introducción desde Supabase
   Future<void> _loadIntroVideo() async {
     try {
       final response = await Supabase.instance.client
@@ -45,10 +46,15 @@ class _JourneyPageState extends State<JourneyPage> {
         final regex = RegExp(r'vimeo\.com/(\d+)');
         final match = regex.firstMatch(url);
 
-        setState(() {
-          _videoId = match != null ? match.group(1)! : null;
-          _loadingVideo = false;
-        });
+        if (match != null) {
+          final videoId = match.group(1)!;
+          setState(() {
+            _videoUrl = 'https://player.vimeo.com/video/$videoId';
+            _loadingVideo = false;
+          });
+        } else {
+          setState(() => _loadingVideo = false);
+        }
       } else {
         setState(() => _loadingVideo = false);
       }
@@ -58,7 +64,7 @@ class _JourneyPageState extends State<JourneyPage> {
     }
   }
 
-  /// 🟢 Cargar progreso (meditaciones y tests) desde journey_session_log
+  /// 🧘 Cargar progreso (meditaciones y tests)
   Future<void> _loadUserProgress() async {
     try {
       final supabase = Supabase.instance.client;
@@ -82,7 +88,6 @@ class _JourneyPageState extends State<JourneyPage> {
     }
   }
 
-  /// 🟢 Guardar meditación completada
   Future<void> _markMeditationComplete(String meditationId) async {
     try {
       final supabase = Supabase.instance.client;
@@ -105,7 +110,6 @@ class _JourneyPageState extends State<JourneyPage> {
     }
   }
 
-  /// 🟢 Guardar test completado
   Future<void> _markTestComplete(String testId) async {
     try {
       final supabase = Supabase.instance.client;
@@ -114,7 +118,7 @@ class _JourneyPageState extends State<JourneyPage> {
 
       await supabase.from('journey_session_log').insert({
         'user_id': user.id,
-        'meditation_id': testId, // reutilizamos el campo
+        'meditation_id': testId,
         'completed': true,
         'duration': 0,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
@@ -155,9 +159,9 @@ class _JourneyPageState extends State<JourneyPage> {
     );
   }
 
-  /// 🟢 Mostrar vídeo intro
+  /// 🎥 Mostrar intro video (diálogo modal)
   void _showIntroVideo(BuildContext context) {
-    if (_videoId == null) {
+    if (_videoUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No intro video found')),
       );
@@ -181,9 +185,9 @@ class _JourneyPageState extends State<JourneyPage> {
               Center(
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: VimeoPlayerWidget(
-                    videoId: _videoId!,
-                    autoPlay: true
+                  child: VimeoVideoPlayer(
+                    url: _videoUrl!,
+                    autoPlay: true,
                   ),
                 ),
               ),
@@ -205,7 +209,6 @@ class _JourneyPageState extends State<JourneyPage> {
     );
   }
 
-  /// 🟢 Abrir meditación y registrar progreso
   Future<void> _openMeditation(BuildContext context, String title) async {
     await Navigator.push(
       context,
@@ -214,7 +217,6 @@ class _JourneyPageState extends State<JourneyPage> {
     await _markMeditationComplete(title);
   }
 
-  /// 🟢 Abrir test y registrar progreso
   Future<void> _openTest(BuildContext context, String testId) async {
     await Navigator.push(
       context,
@@ -447,9 +449,8 @@ class _JourneyPageState extends State<JourneyPage> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: locked
-                      ? const Color(0xFF2A2A2A)
-                      : const Color(0xFF1A1A1A),
+                  color:
+                      locked ? const Color(0xFF2A2A2A) : const Color(0xFF1A1A1A),
                   borderRadius: BorderRadius.circular(12),
                   border: completed
                       ? Border.all(color: const Color(0xFFCBFBC7), width: 1.5)
@@ -473,9 +474,8 @@ class _JourneyPageState extends State<JourneyPage> {
                           const SizedBox(height: 4),
                           Text(lesson['subtitle'],
                               style: TextStyle(
-                                  color: locked
-                                      ? Colors.white38
-                                      : Colors.white70,
+                                  color:
+                                      locked ? Colors.white38 : Colors.white70,
                                   fontSize: 12)),
                         ],
                       ),

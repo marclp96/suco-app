@@ -53,5 +53,32 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+
+	<!-- 🟢 AÑADIDO PARA WEBVIEW / VIMEO -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+
+	<!-- 🟢 Permite reproducir vídeos inline sin abrir pantalla completa -->
+	<key>io.flutter.embedded_views_preview</key>
+	<true/>
+
+	<!-- 🟢 Autoriza dominios de Vimeo -->
+	<key>WKAppBoundDomains</key>
+	<array>
+		<string>player.vimeo.com</string>
+		<string>vimeo.com</string>
+	</array>
+
+	<!-- 🟢 Permite cargas multimedia en WebView -->
+	<key>NSAllowsArbitraryLoadsInWebContent</key>
+	<true/>
+
 </dict>
 </plist>
