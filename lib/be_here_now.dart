@@ -20,7 +20,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
   String? _deepSleepId;
   bool _loadingVideo = true;
 
-  VimeoPlayerWidgetState? _vimeoPlayer; // 👈 Guardamos el estado del reproductor
+  //VimeoPlayerWidgetState? _vimeoPlayer; // 👈 Guardamos el estado del reproductor
 
   @override
   void initState() {
@@ -187,8 +187,8 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
       );
     }
 
-    final player = VimeoPlayerWidget(videoId: _videoId!, autoPlay: true, loop: false);
-    _vimeoPlayer = player.createState(); // 👈 Guardamos el estado del player
+    final player = VimeoPlayerWidget(videoId: _videoId!, autoPlay: true);
+    //_vimeoPlayer = player.createState(); // 👈 Guardamos el estado del player
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -256,7 +256,7 @@ class _BeHereNowPageState extends State<BeHereNowPage> {
                   borderRadius: BorderRadius.circular(16),
                   onTap: () {
                     // 👇 Pausa el vídeo antes de abrir una meditación
-                    _vimeoPlayer?.pauseVideo();
+                    //_vimeoPlayer?.pauseVideo();
 
                     if (card["title"] == "Be Here Now" &&
                         _beHereNowAudioUrl != null) {

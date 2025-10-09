@@ -183,8 +183,7 @@ class _JourneyPageState extends State<JourneyPage> {
                   aspectRatio: 16 / 9,
                   child: VimeoPlayerWidget(
                     videoId: _videoId!,
-                    autoPlay: true,
-                    loop: false,
+                    autoPlay: true
                   ),
                 ),
               ),

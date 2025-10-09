@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -22,7 +24,17 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Esta app necesita acceso a la cámara para escanear códigos QR y capturar fotos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Esta app necesita acceso a tu ubicación para mostrar contenido relevante de tu área.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Esta app necesita acceso al micrófono para grabar videos con audio.</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
@@ -41,32 +53,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-
-	<!-- 🟢 AÑADIDO PARA WEBVIEW / VIMEO -->
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
-
-	<!-- 🟢 Permite reproducir vídeos inline sin abrir pantalla completa -->
-	<key>io.flutter.embedded_views_preview</key>
-	<true/>
-
-	<!-- 🟢 Autoriza dominios de Vimeo -->
-	<key>WKAppBoundDomains</key>
-	<array>
-		<string>player.vimeo.com</string>
-		<string>vimeo.com</string>
-	</array>
-
-	<!-- 🟢 Permite cargas multimedia en WebView -->
-	<key>NSAllowsArbitraryLoadsInWebContent</key>
-	<true/>
-
 </dict>
 </plist>
