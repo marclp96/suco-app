@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:vimeo_video_player/vimeo_video_player.dart'; // ✅ Versión 1.0.1
+import 'package:vimeo_video_player/vimeo_video_player.dart';
 import 'nav.dart';
 import 'today_page.dart';
 import 'live_home.dart';
@@ -21,7 +21,7 @@ class JourneyPage extends StatefulWidget {
 class _JourneyPageState extends State<JourneyPage> {
   int _selectedIndex = 2;
   String? _videoUrl;
-  String? _videoId; // ✅ Añadido para extraer el ID de Vimeo
+  String? _videoId;
   bool _loadingVideo = true;
 
   List<String> _completedItems = [];
@@ -34,7 +34,6 @@ class _JourneyPageState extends State<JourneyPage> {
     _loadUserProgress();
   }
 
-  /// 🎬 Cargar vídeo de introducción desde Supabase
   Future<void> _loadIntroVideo() async {
     try {
       final response = await Supabase.instance.client
@@ -44,8 +43,6 @@ class _JourneyPageState extends State<JourneyPage> {
 
       if (response != null && response['intro_video_url'] != null) {
         final url = response['intro_video_url'] as String;
-
-        // 🧩 Extraer ID de Vimeo desde la URL
         final regExp = RegExp(r'vimeo\.com/(?:video/)?(\d+)');
         final match = regExp.firstMatch(url);
         final id = match != null ? match.group(1)! : null;
@@ -64,7 +61,6 @@ class _JourneyPageState extends State<JourneyPage> {
     }
   }
 
-  /// 🧘 Cargar progreso (meditaciones y tests)
   Future<void> _loadUserProgress() async {
     try {
       final supabase = Supabase.instance.client;
@@ -159,7 +155,6 @@ class _JourneyPageState extends State<JourneyPage> {
     );
   }
 
-  /// 🎥 Mostrar intro video (diálogo modal)
   void _showIntroVideo(BuildContext context) {
     if (_videoId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -185,9 +180,7 @@ class _JourneyPageState extends State<JourneyPage> {
               Center(
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: VimeoVideoPlayer(
-                    videoId: _videoId!, // ✅ Correcto para vimeo_video_player: ^1.0.1
-                  ),
+                  child: VimeoVideoPlayer(videoId: _videoId!),
                 ),
               ),
               Positioned(
@@ -285,42 +278,77 @@ class _JourneyPageState extends State<JourneyPage> {
     );
   }
 
+  // ✅ Header dinámico con saludo por hora + usuario Supabase
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'Good morning',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
+    final user = Supabase.instance.client.auth.currentUser;
+    final supabase = Supabase.instance.client;
+
+    return FutureBuilder(
+      future: supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user!.id)
+          .maybeSingle(),
+      builder: (context, snapshot) {
+        String greeting = _getGreeting();
+        String name = 'there';
+
+        if (snapshot.hasData && snapshot.data != null) {
+          final data = snapshot.data as Map<String, dynamic>?;
+          if (data != null && data['full_name'] != null) {
+            name = data['full_name'];
+          }
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    greeting,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        '$name ',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Text('👋', style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
+                ],
               ),
-              SizedBox(height: 4),
-              Text(
-                'Marc 👋',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 16,
+              Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu, color: Colors.white),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               ),
             ],
           ),
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu, color: Colors.white),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
   }
 
   Widget _buildHeroBanner() {
@@ -379,7 +407,6 @@ class _JourneyPageState extends State<JourneyPage> {
     );
   }
 
-  /// 🔹 SECCIÓN DE SERIES (Connect, Create, Celebrate)
   Widget _buildSeriesSection({
     required String title,
     required String description,
@@ -424,8 +451,9 @@ class _JourneyPageState extends State<JourneyPage> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color:
-                      locked ? const Color(0xFF2A2A2A) : const Color(0xFF1A1A1A),
+                  color: locked
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFF1A1A1A),
                   borderRadius: BorderRadius.circular(12),
                   border: completed
                       ? Border.all(color: const Color(0xFFCBFBC7), width: 1.5)
@@ -453,8 +481,7 @@ class _JourneyPageState extends State<JourneyPage> {
                           Text(
                             lesson['subtitle'],
                             style: TextStyle(
-                              color:
-                                  locked ? Colors.white38 : Colors.white70,
+                              color: locked ? Colors.white38 : Colors.white70,
                               fontSize: 12,
                             ),
                           ),

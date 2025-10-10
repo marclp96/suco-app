@@ -129,51 +129,86 @@ class _LiveHomePageState extends State<LiveHomePage> {
     );
   }
 
-  // ✅ HEADER con botón de menú funcional
+  // ✅ HEADER dinámico con saludo por hora + nombre del usuario de Supabase
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'Good morning',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
+    final user = Supabase.instance.client.auth.currentUser;
+    final supabase = Supabase.instance.client;
+
+    return FutureBuilder(
+      future: supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user!.id)
+          .maybeSingle(),
+      builder: (context, snapshot) {
+        String greeting = _getGreeting();
+        String name = 'there';
+
+        if (snapshot.hasData && snapshot.data != null) {
+          final data = snapshot.data as Map<String, dynamic>?;
+          if (data != null && data['full_name'] != null) {
+            name = data['full_name'];
+          }
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    greeting,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        '$name ',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Text('👋', style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
+                ],
               ),
-              SizedBox(height: 4),
-              Text(
-                'Marc 👋',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 16,
+              GestureDetector(
+                onTap: () {
+                  _scaffoldKey.currentState?.openDrawer(); // 👈 abre el Drawer
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF333333),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.menu, color: Colors.white, size: 20),
                 ),
               ),
             ],
           ),
-          GestureDetector(
-            onTap: () {
-              _scaffoldKey.currentState?.openDrawer(); // 👈 abre el Drawer
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF333333),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.menu, color: Colors.white, size: 20),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  // 🔹 Función auxiliar para saludo según hora
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
   }
 
   /// 🌟 HERO CARD
